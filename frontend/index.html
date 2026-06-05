@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>E-Library</title>
+    <link rel="stylesheet" href="css/styles.css" />
+  </head>
+  <body>
+    <header class="site-header">
+      <div class="container">
+        <h1>E-Library</h1>
+        <p class="tagline">Browse, borrow, and manage your digital collection</p>
+      </div>
+    </header>
+
+    <main class="container">
+      <section class="toolbar" aria-label="Search and admin">
+        <div class="search-wrap">
+          <label for="search" class="visually-hidden">Search books</label>
+          <input
+            type="search"
+            id="search"
+            placeholder="Search by title or author…"
+            autocomplete="off"
+          />
+        </div>
+        <div class="admin-wrap">
+          <label for="api-key" class="admin-label">Admin API key</label>
+          <input
+            type="password"
+            id="api-key"
+            placeholder="Required for add / edit / delete"
+            autocomplete="off"
+          />
+        </div>
+      </section>
+
+      <section class="add-book" aria-labelledby="add-heading">
+        <h2 id="add-heading">Add a book</h2>
+        <form id="add-form" class="add-form">
+          <div class="form-row">
+            <label for="title">Title</label>
+            <input type="text" id="title" name="title" required maxlength="255" />
+          </div>
+          <div class="form-row">
+            <label for="author">Author</label>
+            <input type="text" id="author" name="author" required maxlength="255" />
+          </div>
+          <div class="form-row">
+            <label for="year">Year</label>
+            <input
+              type="number"
+              id="year"
+              name="year"
+              min="1000"
+              max="2100"
+              placeholder="e.g. 2020"
+            />
+          </div>
+          <div class="form-row">
+            <label for="cover">Cover image (optional)</label>
+            <input type="file" id="cover" name="cover" accept="image/jpeg,image/png,image/webp,image/gif" />
+          </div>
+          <div class="form-row">
+            <label for="pdf">PDF file (optional)</label>
+            <input type="file" id="pdf" name="pdf" accept="application/pdf" />
+          </div>
+          <div class="form-actions">
+            <button type="submit" class="btn btn-primary">Add book</button>
+            <button type="reset" class="btn btn-secondary">Clear</button>
+          </div>
+        </form>
+      </section>
+
+      <section class="catalog" aria-labelledby="catalog-heading">
+        <div class="catalog-header">
+          <h2 id="catalog-heading">Catalog</h2>
+          <p id="book-count" class="book-count" aria-live="polite"></p>
+        </div>
+        <p id="status-message" class="status-message" role="status" aria-live="polite"></p>
+        <div id="book-list" class="book-list" role="list"></div>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <div class="container">
+        <p>E-Library &mdash; GitHub Pages + Cloudflare Workers + TiDB + R2</p>
+      </div>
+    </footer>
+
+    <script type="module" src="js/app.js"></script>
+  </body>
+</html>
