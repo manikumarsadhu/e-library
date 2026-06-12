@@ -5,27 +5,28 @@ A simple full-stack digital library: browse books, borrow/return, upload covers 
 | Layer | Technology |
 |-------|------------|
 | Frontend | HTML, CSS, JavaScript (ES modules) |
-| Hosting | GitHub Pages (`frontend/`) |
-| API | Cloudflare Workers |
+| Hosting | Vercel (Frontend & API unified) |
+| API | Vercel Serverless Functions (Node.js) |
 | Database | TiDB Cloud (MySQL-compatible) |
-| Files | Cloudflare R2 |
+| Files | Cloudinary |
 
 ## Project structure
 
 ```
 e-library/
-├── frontend/          # Static UI (GitHub Pages)
-├── worker/            # Cloudflare Worker API
+├── frontend/          # Static UI
+├── api/               # Vercel Serverless Functions
 ├── schema/init.sql    # TiDB table + optional seed
-└── .github/workflows/ # Pages deploy on push to main
+├── vercel.json        # Vercel routing configuration
+└── package.json       # Root node packages & scripts
 ```
 
 ## Prerequisites
 
 - [Node.js](https://nodejs.org/) 18+
-- [Cloudflare](https://dash.cloudflare.com/) account (Workers + R2)
+- [Vercel CLI](https://vercel.com/docs/cli) (`npm install -g vercel`)
+- [Cloudinary](https://cloudinary.com/) account
 - [TiDB Cloud](https://tidbcloud.com/) cluster (free tier works)
-- GitHub repo for Pages (optional Actions workflow included)
 
 ## 1. Database (TiDB Cloud)
 
@@ -33,95 +34,43 @@ e-library/
 2. Open the SQL editor and run [`schema/init.sql`](schema/init.sql).
 3. Note **host**, **user**, **password**, and **database** name.
 
-## 2. R2 bucket
+## 2. Cloudinary Setup
 
-```bash
-cd worker
-npx wrangler r2 bucket create e-library-files
+1. Sign up/log in to your Cloudinary Dashboard.
+2. Note your **Cloud Name**, **API Key**, and **API Secret**.
+
+## 3. Environment Variables Configuration
+
+Copy environment variables template (or create a `.env` file at the root) for local development:
+
+```env
+TIDB_HOST=your-tidb-host
+TIDB_USER=your-tidb-user
+TIDB_PASSWORD=your-tidb-password
+TIDB_DATABASE=your-tidb-database
+API_KEY=your-custom-admin-api-key
+CLOUDINARY_CLOUD_NAME=your-cloudinary-cloud-name
+CLOUDINARY_API_KEY=your-cloudinary-api-key
+CLOUDINARY_API_SECRET=your-cloudinary-api-secret
 ```
 
-The bucket name must match `bucket_name` in [`worker/wrangler.toml`](worker/wrangler.toml).
+Configure these same environment variables in your Vercel project dashboard under **Project Settings > Environment Variables**.
 
-## 3. Cloudflare Worker
+## 4. Installation & Local Development
+
+Install dependencies at the root:
 
 ```bash
-cd worker
 npm install
 ```
 
-Copy secrets template and fill in values for local dev:
+Start the Vercel local development server:
 
 ```bash
-cp .dev.vars.example .dev.vars
-```
-
-Edit `.dev.vars` with your TiDB credentials and an `API_KEY` for admin writes.
-
-Set the same secrets in production:
-
-```bash
-npx wrangler secret put TIDB_HOST
-npx wrangler secret put TIDB_USER
-npx wrangler secret put TIDB_PASSWORD
-npx wrangler secret put TIDB_DATABASE
-npx wrangler secret put API_KEY
-```
-
-Update `CORS_ORIGIN` in [`worker/wrangler.toml`](worker/wrangler.toml) to your GitHub Pages URL, e.g.:
-
-```toml
-CORS_ORIGIN = "https://yourusername.github.io"
-```
-
-Deploy:
-
-```bash
-npm run deploy
-```
-
-Copy the Worker URL (e.g. `https://e-library-api.your-subdomain.workers.dev`).
-
-## 4. Frontend config
-
-Edit [`frontend/js/config.js`](frontend/js/config.js):
-
-```javascript
-export const API_BASE_URL = "https://e-library-api.your-subdomain.workers.dev";
-```
-
-## 5. GitHub Pages
-
-**Option A — GitHub Actions (recommended)**
-
-1. Repo → **Settings** → **Pages** → Source: **GitHub Actions**.
-2. Push to `main`; the workflow deploys `frontend/`.
-
-**Option B — Manual**
-
-Settings → Pages → Deploy from branch → folder `/frontend`.
-
-After deploy, set Worker `CORS_ORIGIN` to your Pages URL if you have not already.
-
-## Local development
-
-**API**
-
-```bash
-cd worker
 npm run dev
 ```
 
-Uses `.dev.vars` for TiDB and `API_KEY`. R2 uses the remote bucket binding in dev.
-
-**Frontend**
-
-```bash
-npx serve frontend
-```
-
-Set `API_BASE_URL` in `frontend/js/config.js` to `http://127.0.0.1:8787` and `CORS_ORIGIN` in `wrangler.toml` to `http://localhost:3000` (or your serve port).
-
-Open the site, enter the same `API_KEY` in the admin field, then add/borrow/delete books.
+This will start a dev server (typically at `http://localhost:3000`) serving both the static frontend and the serverless functions under `/api/*`.
 
 ## API reference
 
@@ -131,18 +80,17 @@ Open the site, enter the same `API_KEY` in the admin field, then add/borrow/dele
 | GET | `/api/books/:id` | No | Get one book |
 | POST | `/api/books` | Bearer | Create book (JSON) |
 | PATCH | `/api/books/:id` | Bearer | Update metadata/status |
-| DELETE | `/api/books/:id` | Bearer | Delete book + R2 objects |
+| DELETE | `/api/books/:id` | Bearer | Delete book + Cloudinary assets |
 | POST | `/api/books/:id/cover` | Bearer | Upload cover (`multipart`, field `file`) |
-| POST | `/api/books/:id/file` | Bearer | Upload PDF (`multipart`, field `file`) |
-| GET | `/api/files/:key` | No | Download/stream R2 object |
+| POST | `/api/books/:id/file` | Bearer | Upload PDF/file (`multipart`, field `file`) |
+| GET | `/api/files/:key` | No | Redirect to the Cloudinary URL |
 
-If `API_KEY` is not set on the Worker, write endpoints are open (not recommended for production).
+If `API_KEY` is not set on the Vercel deployment, write endpoints are open.
 
 ## Security notes
 
-- Never commit `.dev.vars` or production API keys.
+- Never commit database credentials or Cloudinary secrets. Keep them in Vercel dashboard and local `.env`.
 - Use `API_KEY` in production and share it only with admins.
-- TiDB credentials live only in Worker secrets, never in the frontend.
 
 ## License
 

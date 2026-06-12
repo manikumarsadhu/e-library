@@ -1,4 +1,3 @@
-// Production: set to your deployed Worker URL after `wrangler deploy`
-export const API_BASE_URL = "http://127.0.0.1:8787";
+// Serves from the same origin on Vercel (both in development and production)
+export const API_BASE_URL = window.location.origin;
 
-// Local dev: use http://127.0.0.1:8787 and run `npm run dev` in worker/

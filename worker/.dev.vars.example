@@ -1,5 +1,0 @@
-TIDB_HOST=gateway01.us-west-2.prod.aws.tidbcloud.com
-TIDB_USER=your_user
-TIDB_PASSWORD=your_password
-TIDB_DATABASE=e_library
-API_KEY=your-dev-admin-key

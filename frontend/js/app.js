@@ -32,6 +32,21 @@ function createEl(tag, className, text) {
   return el;
 }
 
+function getPdfThumbnailUrl(fileKey) {
+  if (!fileKey) return null;
+  if (fileKey.startsWith("cloudinary:")) {
+    const parts = fileKey.split(":");
+    if (parts.length >= 4) {
+      const url = parts.slice(3).join(":");
+      // Change extension to jpg and request page 1 (pg_1)
+      let thumbUrl = url.replace(/\.pdf$/i, ".jpg");
+      thumbUrl = thumbUrl.replace("/upload/", "/upload/pg_1/");
+      return thumbUrl;
+    }
+  }
+  return null;
+}
+
 function renderCover(book) {
   const wrap = createEl("div", "book-cover");
   if (book.cover_key) {
@@ -40,11 +55,23 @@ function renderCover(book) {
     img.alt = `Cover of ${book.title}`;
     img.loading = "lazy";
     wrap.appendChild(img);
+  } else if (book.file_key) {
+    const thumbUrl = getPdfThumbnailUrl(book.file_key);
+    if (thumbUrl) {
+      const img = document.createElement("img");
+      img.src = thumbUrl;
+      img.alt = `Cover of ${book.title} (auto-generated)`;
+      img.loading = "lazy";
+      wrap.appendChild(img);
+    } else {
+      wrap.appendChild(createEl("span", "book-cover-placeholder", "No cover"));
+    }
   } else {
     wrap.appendChild(createEl("span", "book-cover-placeholder", "No cover"));
   }
   return wrap;
 }
+
 
 function renderBookCard(book) {
   const card = createEl("article", "book-card");
@@ -78,13 +105,10 @@ function renderBookCard(book) {
   actions.appendChild(toggleBtn);
 
   if (book.file_key) {
-    const link = document.createElement("a");
-    link.href = fileUrl(book.file_key);
-    link.className = "btn btn-ghost";
-    link.textContent = "Download";
-    link.target = "_blank";
-    link.rel = "noopener noreferrer";
-    actions.appendChild(link);
+    const readBtn = createEl("button", "btn btn-ghost", "Read");
+    readBtn.type = "button";
+    readBtn.dataset.action = "preview";
+    actions.appendChild(readBtn);
   }
 
   const deleteBtn = createEl("button", "btn btn-danger", "Delete");
@@ -132,6 +156,15 @@ bookList.addEventListener("click", async (e) => {
   const card = btn.closest(".book-card");
   const id = card?.dataset.id;
   if (!id) return;
+
+  // Read/preview action does NOT require Admin API key auth
+  if (btn.dataset.action === "preview") {
+    const book = allBooks.find((b) => b.id === id);
+    if (book && book.file_key) {
+      openPreview(book.title, book.file_key);
+    }
+    return;
+  }
 
   if (!getApiKey()) {
     setStatus("Enter your admin API key to manage books.", "error");
@@ -210,3 +243,129 @@ apiKeyInput.addEventListener("change", () => {
 apiKeyInput.value = getApiKey();
 
 loadBooks();
+
+// PDF.js Integration for Previewing PDFs
+const { pdfjsLib } = window;
+if (pdfjsLib) {
+  pdfjsLib.GlobalWorkerOptions.workerSrc =
+    "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js";
+}
+
+let pdfDoc = null;
+let pageNum = 1;
+let pageRendering = false;
+let pageNumPending = null;
+const scale = 1.5;
+const pdfCanvas = document.getElementById("pdf-canvas");
+const ctx = pdfCanvas.getContext("2d");
+
+const previewModal = document.getElementById("preview-modal");
+const previewTitle = document.getElementById("preview-title");
+const closePreviewBtn = document.getElementById("close-preview");
+const prevPageBtn = document.getElementById("prev-page");
+const nextPageBtn = document.getElementById("next-page");
+const pageNumSpan = document.getElementById("page-num");
+const pageCountSpan = document.getElementById("page-count");
+
+async function renderPage(num) {
+  if (!pdfDoc) return;
+  pageRendering = true;
+  try {
+    const page = await pdfDoc.getPage(num);
+    
+    // Resolve screen device pixel ratio for high-DPI screen support (e.g., Retina, 4K displays)
+    const dpr = window.devicePixelRatio || 1;
+    const viewport = page.getViewport({ scale: scale * dpr });
+    
+    // Set physical drawing buffer size
+    pdfCanvas.width = viewport.width;
+    pdfCanvas.height = viewport.height;
+
+    // Responsive scaling: stretch to fit narrow viewports, but cap at the logical page width
+    pdfCanvas.style.width = "100%";
+    pdfCanvas.style.maxWidth = `${viewport.width / dpr}px`;
+    pdfCanvas.style.height = "auto";
+
+
+    const renderContext = {
+      canvasContext: ctx,
+      viewport: viewport,
+    };
+    const renderTask = page.render(renderContext);
+    await renderTask.promise;
+
+    pageRendering = false;
+    if (pageNumPending !== null) {
+      renderPage(pageNumPending);
+      pageNumPending = null;
+    }
+
+    pageNumSpan.textContent = num;
+    prevPageBtn.disabled = num <= 1;
+    nextPageBtn.disabled = num >= pdfDoc.numPages;
+  } catch (err) {
+    console.error("Error rendering page:", err);
+  }
+}
+
+
+function queueRenderPage(num) {
+  if (pageRendering) {
+    pageNumPending = num;
+  } else {
+    renderPage(num);
+  }
+}
+
+async function openPreview(title, key) {
+  previewTitle.textContent = title;
+  previewModal.hidden = false;
+  pageNumSpan.textContent = "1";
+  pageCountSpan.textContent = "...";
+  prevPageBtn.disabled = true;
+  nextPageBtn.disabled = true;
+
+  ctx.clearRect(0, 0, pdfCanvas.width, pdfCanvas.height);
+
+  try {
+    const url = fileUrl(key);
+    const loadingTask = pdfjsLib.getDocument(url);
+    pdfDoc = await loadingTask.promise;
+    pageCountSpan.textContent = pdfDoc.numPages;
+
+    pageNum = 1;
+    renderPage(pageNum);
+  } catch (err) {
+    console.error("Error loading PDF:", err);
+    alert("Failed to load PDF preview.");
+    closePreview();
+  }
+}
+
+function closePreview() {
+  previewModal.hidden = true;
+  pdfDoc = null;
+}
+
+// Listeners
+prevPageBtn.addEventListener("click", () => {
+  if (pageNum <= 1) return;
+  pageNum--;
+  queueRenderPage(pageNum);
+});
+
+nextPageBtn.addEventListener("click", () => {
+  if (!pdfDoc || pageNum >= pdfDoc.numPages) return;
+  pageNum++;
+  queueRenderPage(pageNum);
+});
+
+closePreviewBtn.addEventListener("click", closePreview);
+previewModal.addEventListener("click", (e) => {
+  if (e.target === previewModal) {
+    closePreview();
+  }
+});
+
+pdfCanvas.addEventListener("contextmenu", (e) => e.preventDefault());
+
