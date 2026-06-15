@@ -42,8 +42,23 @@ async function parseResponse(res) {
 
 export function fileUrl(key) {
   if (!key) return null;
-  const encoded = key.split("/").map(encodeURIComponent).join("/");
-  return `${API_BASE_URL}/api/files/${encoded}`;
+  return `${API_BASE_URL}/api/files/${encodeURIComponent(key)}`;
+}
+
+export async function validateApiKey(key) {
+  if (!key) return false;
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/auth`, {
+      method: "GET",
+      headers: {
+        Accept: "application/json",
+        Authorization: `Bearer ${key}`,
+      },
+    });
+    return res.status === 200;
+  } catch {
+    return false;
+  }
 }
 
 export async function fetchBooks(query = "") {
@@ -64,15 +79,6 @@ export async function createBook(payload) {
   return data.book;
 }
 
-export async function updateBookStatus(id, status) {
-  const res = await fetch(`${API_BASE_URL}/api/books/${id}`, {
-    method: "PATCH",
-    headers: { ...headers(true), "Content-Type": "application/json" },
-    body: JSON.stringify({ status }),
-  });
-  const data = await parseResponse(res);
-  return data.book;
-}
 
 export async function deleteBook(id) {
   const res = await fetch(`${API_BASE_URL}/api/books/${id}`, {

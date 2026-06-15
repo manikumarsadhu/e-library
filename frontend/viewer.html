@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Document Viewer</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf_viewer.min.css" />
+    <style>
+      :root {
+        --bg-color: #0f172a;
+        --surface-color: #1e293b;
+        --border-color: #334155;
+        --text-color: #f8fafc;
+        --text-muted: #94a3b8;
+        --primary-color: #3b82f6;
+        --primary-hover: #2563eb;
+      }
+      body {
+        margin: 0;
+        padding: 0;
+        background-color: var(--bg-color);
+        color: var(--text-color);
+        font-family: system-ui, -apple-system, sans-serif;
+        height: 100vh;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        user-select: none;
+        transition: background-color 0.2s, color 0.2s;
+      }
+      
+      /* Theme styles */
+      body.theme-dark {
+        --bg-color: #0f172a;
+        --surface-color: #1e293b;
+        --border-color: #334155;
+        --text-color: #f8fafc;
+        --text-muted: #94a3b8;
+      }
+      body.theme-dark #viewer-container {
+        background-color: #0b0f19;
+      }
+      body.theme-dark canvas {
+        filter: invert(0.9) hue-rotate(180deg);
+      }
+      
+      body.theme-sepia {
+        --bg-color: #f4ecd8;
+        --surface-color: #e4d7ba;
+        --border-color: #d0c09e;
+        --text-color: #5c4033;
+        --text-muted: #8c7060;
+      }
+      body.theme-sepia #viewer-container {
+        background-color: #fbf0d9;
+      }
+      body.theme-sepia canvas {
+        filter: sepia(0.65) contrast(0.9) brightness(0.95);
+      }
+      
+      body.theme-light {
+        --bg-color: #f1f5f9;
+        --surface-color: #ffffff;
+        --border-color: #cbd5e1;
+        --text-color: #0f172a;
+        --text-muted: #64748b;
+      }
+      body.theme-light #viewer-container {
+        background-color: #e2e8f0;
+      }
+      body.theme-light canvas {
+        filter: none;
+      }
+
+      header {
+        background-color: var(--surface-color);
+        border-bottom: 1px solid var(--border-color);
+        padding: 0.625rem 1rem;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+        z-index: 10;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        transition: background-color 0.2s, border-color 0.2s;
+      }
+      .doc-info {
+        display: flex;
+        flex-direction: column;
+        gap: 0.125rem;
+        min-width: 0;
+        flex: 1 1 120px;
+      }
+      .doc-title {
+        font-weight: 600;
+        font-size: 0.9375rem;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .doc-pages {
+        font-size: 0.7rem;
+        color: var(--text-muted);
+      }
+      .controls {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        flex-shrink: 0;
+      }
+      .btn {
+        background: transparent;
+        border: 1px solid var(--border-color);
+        color: var(--text-color);
+        border-radius: 6px;
+        padding: 0.5rem;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.875rem;
+        transition: background 0.15s, border-color 0.15s, color 0.15s;
+      }
+      .btn:hover {
+        background: var(--border-color);
+      }
+      .btn:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+      select.btn {
+        padding: 0.4rem 0.75rem;
+        font-weight: 500;
+        outline: none;
+      }
+      select.btn option {
+        background-color: var(--surface-color);
+        color: var(--text-color);
+      }
+      .zoom-level {
+        font-size: 0.875rem;
+        font-weight: 500;
+        min-width: 45px;
+        text-align: center;
+      }
+      #viewer-container {
+        flex: 1;
+        overflow: auto;
+        padding: 1.5rem;
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 1.5rem;
+        transition: background-color 0.2s;
+        box-sizing: border-box;
+      }
+      @media (max-width: 480px) {
+        #viewer-container {
+          padding: 0.75rem;
+          gap: 0.75rem;
+        }
+      }
+      .page-container {
+        position: relative;
+        box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.4), 0 4px 6px -2px rgba(0, 0, 0, 0.4);
+        background: white;
+        border-radius: 4px;
+        overflow: hidden;
+        margin-inline: auto;
+        flex-shrink: 0;
+      }
+      canvas {
+        display: block;
+      }
+      .textLayer {
+        mix-blend-mode: multiply;
+        user-select: text !important;
+      }
+      
+      /* Resume prompt toast style */
+      #resume-toast {
+        position: fixed;
+        bottom: 1rem;
+        right: 1rem;
+        left: 1rem;
+        max-width: 380px;
+        margin-inline: auto;
+        background-color: var(--surface-color);
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+        padding: 0.875rem;
+        box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        z-index: 100;
+        animation: slideIn 0.3s ease-out;
+      }
+      #resume-toast.hidden {
+        display: none !important;
+      }
+      .toast-msg {
+        font-size: 0.875rem;
+        font-weight: 500;
+      }
+      @keyframes slideIn {
+        from { transform: translateY(100px); opacity: 0; }
+        to { transform: translateY(0); opacity: 1; }
+      }
+
+      /* Loading State */
+      #loading {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        font-size: 1.25rem;
+        font-weight: 500;
+        color: var(--text-muted);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 1rem;
+      }
+      .spinner {
+        width: 40px;
+        height: 40px;
+        border: 4px solid var(--border-color);
+        border-top: 4px solid var(--primary-color);
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+      }
+      @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+      }
+    </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js"></script>
+  </head>
+  <body class="theme-dark">
+    <header>
+      <div class="doc-info">
+        <div class="doc-title" id="doc-title">Loading...</div>
+        <div class="doc-pages" id="doc-pages">Page: - / -</div>
+      </div>
+      <div class="controls">
+        <button id="zoom-out" class="btn" title="Zoom Out">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+        </button>
+        <span class="zoom-level" id="zoom-value">125%</span>
+        <button id="zoom-in" class="btn" title="Zoom In">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+        </button>
+        <button id="zoom-fit" class="btn" title="Fit Width">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M4 12h16M4 12l3-3M4 12l3 3"/>
+            <path d="M20 12l-3-3M20 12l-3 3"/>
+          </svg>
+        </button>
+        <select id="theme-select" class="btn" title="Change Theme">
+          <option value="dark">🌙</option>
+          <option value="light">☀️</option>
+          <option value="sepia">📖</option>
+        </select>
+        <button id="fullscreen-toggle" class="btn" title="Toggle Fullscreen">
+          <svg id="fullscreen-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"></path>
+          </svg>
+        </button>
+      </div>
+    </header>
+
+    <div id="viewer-container">
+      <div id="loading">
+        <div class="spinner"></div>
+        <div>Loading Document...</div>
+      </div>
+    </div>
+
+    <!-- Resume reading toast notification -->
+    <div id="resume-toast" class="hidden">
+      <div class="toast-msg" id="resume-msg">Resume reading on page 1?</div>
+      <button id="resume-yes" class="btn btn-primary" style="background-color: var(--primary-color); border:none; padding: 0.4rem 0.8rem;">Yes</button>
+      <button id="resume-no" class="btn" style="padding: 0.4rem 0.8rem;">Dismiss</button>
+    </div>
+
+    <script src="js/viewer.js"></script>
+  </body>
+</html>

@@ -82,7 +82,8 @@ const server = http.createServer((req, res) => {
       req.on("end", () => {
         try {
           req.body = body ? JSON.parse(body) : {};
-        } catch (err) {
+        // eslint-disable-next-line no-unused-vars
+        } catch (_err) {
           req.body = {};
         }
         handler(req, res);

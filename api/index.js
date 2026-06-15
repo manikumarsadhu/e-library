@@ -12,7 +12,7 @@ function configureCloudinary() {
 }
 
 const BOOK_COLUMNS =
-  "id, title, author, year, status, cover_key, file_key, created_at, updated_at";
+  "id, title, author, year, cover_key, file_key, created_at, updated_at";
 
 function getDb() {
   const host = process.env.TIDB_HOST;
@@ -61,7 +61,6 @@ function rowToBook(row) {
     title: row.title,
     author: row.author,
     year: row.year,
-    status: row.status,
     cover_key: row.cover_key,
     file_key: row.file_key,
     created_at: row.created_at,
@@ -100,15 +99,15 @@ async function getBook(id) {
 }
 
 async function createBook(body) {
-  const { title, author, year, status = "available" } = body || {};
+  const { title, author, year } = body || {};
   if (!title?.trim() || !author?.trim()) {
     throw new Error("title and author are required");
   }
   const id = crypto.randomUUID();
   const db = getDb();
   await db.execute(
-    `INSERT INTO books (id, title, author, year, status) VALUES (?, ?, ?, ?, ?)`,
-    [id, title.trim(), author.trim(), year || null, status]
+    `INSERT INTO books (id, title, author, year) VALUES (?, ?, ?, ?)`,
+    [id, title.trim(), author.trim(), year || null]
   );
   return getBook(id);
 }
@@ -120,19 +119,15 @@ async function updateBook(id, body) {
   const title = body.title !== undefined ? body.title.trim() : existing.title;
   const author = body.author !== undefined ? body.author.trim() : existing.author;
   const year = body.year !== undefined ? body.year : existing.year;
-  const status = body.status !== undefined ? body.status : existing.status;
 
   if (!title || !author) {
     throw new Error("title and author cannot be empty");
   }
-  if (status !== "available" && status !== "on_loan") {
-    throw new Error("status must be available or on_loan");
-  }
 
   const db = getDb();
   await db.execute(
-    `UPDATE books SET title = ?, author = ?, year = ?, status = ? WHERE id = ?`,
-    [title, author, year || null, status, id]
+    `UPDATE books SET title = ?, author = ?, year = ? WHERE id = ?`,
+    [title, author, year || null, id]
   );
   return getBook(id);
 }
@@ -243,12 +238,11 @@ async function uploadAsset(bookId, req, res, kind) {
     return { error: "Content-Type must be multipart/form-data", status: 400 };
   }
 
-  let fileBuffer, mimeType, filename;
+  let fileBuffer, mimeType;
   try {
     const parsed = await parseMultipart(req);
     fileBuffer = parsed.fileBuffer;
     mimeType = parsed.mimeType;
-    filename = parsed.filename;
   } catch (err) {
     return { error: `Failed to parse file: ${err.message}`, status: 400 };
   }
@@ -272,7 +266,6 @@ async function uploadAsset(bookId, req, res, kind) {
   }
 
   // Upload configuration
-  const ext = filename ? filename.split(".").pop() : kind === "cover" ? "jpg" : "pdf";
   const customPublicId = `${bookId}_${crypto.randomUUID()}`;
   // Both covers and PDF files are uploaded as "image" in Cloudinary.
   // This allows PDF uploads to bypass Cloudinary's strict 10MB "raw" file size limit on the free tier (images have a 25MB limit).
@@ -334,6 +327,14 @@ export default async function handler(req, res) {
       return res.status(200).json({ books });
     }
 
+    // GET /api/auth
+    if (method === "GET" && parts[0] === "api" && parts[1] === "auth" && parts.length === 2) {
+      if (requireAuth(req)) {
+        return res.status(200).json({ ok: true });
+      }
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
     // GET /api/books/:id
     if (method === "GET" && parts[0] === "api" && parts[1] === "books" && parts.length === 3) {
       const book = await getBook(parts[2]);
@@ -349,8 +350,24 @@ export default async function handler(req, res) {
       if (!parsed) {
         return res.status(404).json({ error: "File not found or legacy storage" });
       }
-      // Redirect to Cloudinary URL
-      return res.redirect(302, parsed.url);
+      try {
+        const response = await fetch(parsed.url);
+        if (!response.ok) {
+          return res.status(response.status).json({ error: "Failed to fetch file from storage" });
+        }
+        const contentType = response.headers.get("content-type") || "application/octet-stream";
+        const arrayBuffer = await response.arrayBuffer();
+        const buffer = Buffer.from(arrayBuffer);
+        res.writeHead(200, {
+          "Content-Type": contentType,
+          "Content-Disposition": "inline",
+          "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
+        });
+        return res.end(buffer);
+      } catch (err) {
+        console.error("Error proxying file:", err);
+        return res.status(500).json({ error: "Internal server error proxying file" });
+      }
     }
 
     // Auth verification for modifying methods

@@ -5,7 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "node dev-server.js",
-    "deploy": "vercel deploy --prod"
+    "deploy": "vercel deploy --prod",
+    "lint": "eslint api/ frontend/js/ dev-server.js",
+    "lint:fix": "eslint api/ frontend/js/ dev-server.js --fix"
   },
   "dependencies": {
     "@tidbcloud/serverless": "^0.2.0",
@@ -13,6 +15,9 @@
     "cloudinary": "^2.2.0"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "eslint": "^10.5.0",
+    "globals": "^17.6.0",
     "vercel": "^37.0.0"
   }
 }

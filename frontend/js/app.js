@@ -1,13 +1,13 @@
 import {
   fetchBooks,
   createBook,
-  updateBookStatus,
   deleteBook,
   uploadCover,
   uploadFile,
   fileUrl,
   getApiKey,
   setApiKey,
+  validateApiKey,
 } from "./api.js";
 
 const bookList = document.getElementById("book-list");
@@ -72,7 +72,6 @@ function renderCover(book) {
   return wrap;
 }
 
-
 function renderBookCard(book) {
   const card = createEl("article", "book-card");
   card.setAttribute("role", "listitem");
@@ -86,23 +85,7 @@ function renderBookCard(book) {
     createEl("p", "book-meta", `${book.author}${book.year ? ` · ${book.year}` : ""}`)
   );
 
-  const badge = createEl(
-    "span",
-    `badge ${book.status === "on_loan" ? "badge-loan" : "badge-available"}`,
-    book.status === "on_loan" ? "On loan" : "Available"
-  );
-  body.appendChild(badge);
-
   const actions = createEl("div", "book-actions");
-
-  const toggleBtn = createEl(
-    "button",
-    "btn btn-ghost",
-    book.status === "on_loan" ? "Return" : "Borrow"
-  );
-  toggleBtn.type = "button";
-  toggleBtn.dataset.action = "toggle";
-  actions.appendChild(toggleBtn);
 
   if (book.file_key) {
     const readBtn = createEl("button", "btn btn-ghost", "Read");
@@ -161,7 +144,8 @@ bookList.addEventListener("click", async (e) => {
   if (btn.dataset.action === "preview") {
     const book = allBooks.find((b) => b.id === id);
     if (book && book.file_key) {
-      openPreview(book.title, book.file_key);
+      const viewerUrl = `viewer.html?file=${encodeURIComponent(fileUrl(book.file_key))}&title=${encodeURIComponent(book.title)}`;
+      window.open(viewerUrl, "_blank");
     }
     return;
   }
@@ -169,20 +153,6 @@ bookList.addEventListener("click", async (e) => {
   if (!getApiKey()) {
     setStatus("Enter your admin API key to manage books.", "error");
     apiKeyInput.focus();
-    return;
-  }
-
-  if (btn.dataset.action === "toggle") {
-    const book = allBooks.find((b) => b.id === id);
-    const next = book?.status === "on_loan" ? "available" : "on_loan";
-    setStatus("Updating…");
-    try {
-      await updateBookStatus(id, next);
-      setStatus(next === "on_loan" ? "Book borrowed." : "Book returned.", "success");
-      await loadBooks();
-    } catch (err) {
-      setStatus(err.message, "error");
-    }
     return;
   }
 
@@ -236,136 +206,31 @@ searchInput.addEventListener("input", () => {
   searchDebounce = setTimeout(loadBooks, 300);
 });
 
-apiKeyInput.addEventListener("change", () => {
-  setApiKey(apiKeyInput.value.trim());
+let authDebounce = null;
+
+async function updateAdminUI() {
+  const key = getApiKey();
+  if (!key) {
+    document.body.classList.remove("is-admin");
+    return;
+  }
+  const isValid = await validateApiKey(key);
+  document.body.classList.toggle("is-admin", isValid);
+}
+
+apiKeyInput.addEventListener("input", () => {
+  const value = apiKeyInput.value.trim();
+  setApiKey(value);
+  if (!value) {
+    clearTimeout(authDebounce);
+    document.body.classList.remove("is-admin");
+  } else {
+    clearTimeout(authDebounce);
+    authDebounce = setTimeout(updateAdminUI, 300);
+  }
 });
 
 apiKeyInput.value = getApiKey();
+updateAdminUI();
 
 loadBooks();
-
-// PDF.js Integration for Previewing PDFs
-const { pdfjsLib } = window;
-if (pdfjsLib) {
-  pdfjsLib.GlobalWorkerOptions.workerSrc =
-    "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js";
-}
-
-let pdfDoc = null;
-let pageNum = 1;
-let pageRendering = false;
-let pageNumPending = null;
-const scale = 1.5;
-const pdfCanvas = document.getElementById("pdf-canvas");
-const ctx = pdfCanvas.getContext("2d");
-
-const previewModal = document.getElementById("preview-modal");
-const previewTitle = document.getElementById("preview-title");
-const closePreviewBtn = document.getElementById("close-preview");
-const prevPageBtn = document.getElementById("prev-page");
-const nextPageBtn = document.getElementById("next-page");
-const pageNumSpan = document.getElementById("page-num");
-const pageCountSpan = document.getElementById("page-count");
-
-async function renderPage(num) {
-  if (!pdfDoc) return;
-  pageRendering = true;
-  try {
-    const page = await pdfDoc.getPage(num);
-    
-    // Resolve screen device pixel ratio for high-DPI screen support (e.g., Retina, 4K displays)
-    const dpr = window.devicePixelRatio || 1;
-    const viewport = page.getViewport({ scale: scale * dpr });
-    
-    // Set physical drawing buffer size
-    pdfCanvas.width = viewport.width;
-    pdfCanvas.height = viewport.height;
-
-    // Responsive scaling: stretch to fit narrow viewports, but cap at the logical page width
-    pdfCanvas.style.width = "100%";
-    pdfCanvas.style.maxWidth = `${viewport.width / dpr}px`;
-    pdfCanvas.style.height = "auto";
-
-
-    const renderContext = {
-      canvasContext: ctx,
-      viewport: viewport,
-    };
-    const renderTask = page.render(renderContext);
-    await renderTask.promise;
-
-    pageRendering = false;
-    if (pageNumPending !== null) {
-      renderPage(pageNumPending);
-      pageNumPending = null;
-    }
-
-    pageNumSpan.textContent = num;
-    prevPageBtn.disabled = num <= 1;
-    nextPageBtn.disabled = num >= pdfDoc.numPages;
-  } catch (err) {
-    console.error("Error rendering page:", err);
-  }
-}
-
-
-function queueRenderPage(num) {
-  if (pageRendering) {
-    pageNumPending = num;
-  } else {
-    renderPage(num);
-  }
-}
-
-async function openPreview(title, key) {
-  previewTitle.textContent = title;
-  previewModal.hidden = false;
-  pageNumSpan.textContent = "1";
-  pageCountSpan.textContent = "...";
-  prevPageBtn.disabled = true;
-  nextPageBtn.disabled = true;
-
-  ctx.clearRect(0, 0, pdfCanvas.width, pdfCanvas.height);
-
-  try {
-    const url = fileUrl(key);
-    const loadingTask = pdfjsLib.getDocument(url);
-    pdfDoc = await loadingTask.promise;
-    pageCountSpan.textContent = pdfDoc.numPages;
-
-    pageNum = 1;
-    renderPage(pageNum);
-  } catch (err) {
-    console.error("Error loading PDF:", err);
-    alert("Failed to load PDF preview.");
-    closePreview();
-  }
-}
-
-function closePreview() {
-  previewModal.hidden = true;
-  pdfDoc = null;
-}
-
-// Listeners
-prevPageBtn.addEventListener("click", () => {
-  if (pageNum <= 1) return;
-  pageNum--;
-  queueRenderPage(pageNum);
-});
-
-nextPageBtn.addEventListener("click", () => {
-  if (!pdfDoc || pageNum >= pdfDoc.numPages) return;
-  pageNum++;
-  queueRenderPage(pageNum);
-});
-
-closePreviewBtn.addEventListener("click", closePreview);
-previewModal.addEventListener("click", (e) => {
-  if (e.target === previewModal) {
-    closePreview();
-  }
-});
-
-pdfCanvas.addEventListener("contextmenu", (e) => e.preventDefault());
-
