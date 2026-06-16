@@ -33,6 +33,21 @@ function parseMultipart(req) {
   });
 }
 
+function detectRealMimeType(buffer) {
+  if (!buffer || buffer.length < 4) return null;
+  const header = buffer.toString("hex", 0, 4).toLowerCase();
+  
+  if (header === "25504446") return "application/pdf";
+  if (header === "89504e47") return "image/png";
+  if (header.startsWith("ffd8ff")) return "image/jpeg";
+  if (header === "47494638") return "image/gif";
+  if (header === "52494646") {
+    const riffType = buffer.toString("hex", 8, 12).toLowerCase();
+    if (riffType === "57454250") return "image/webp";
+  }
+  return null;
+}
+
 export async function uploadAsset(bookId, req, kind) {
   const book = await getBook(bookId);
   if (!book) return { error: "Book not found", status: 404 };
@@ -44,22 +59,21 @@ export async function uploadAsset(bookId, req, kind) {
   }
 
   let fileBuffer;
-  let mimeType;
   try {
     const parsed = await parseMultipart(req);
     fileBuffer = parsed.fileBuffer;
-    mimeType = parsed.mimeType;
   } catch (err) {
     return { error: `Failed to parse file: ${err.message}`, status: 400 };
   }
 
   if (!fileBuffer) return { error: "file field is required", status: 400 };
 
+  const realMimeType = detectRealMimeType(fileBuffer);
   const allowedCovers = ["image/jpeg", "image/png", "image/webp", "image/gif"];
   const allowedFiles = ["application/pdf", ...allowedCovers];
   const allowed = kind === "cover" ? allowedCovers : allowedFiles;
 
-  if (!allowed.includes(mimeType)) {
+  if (!realMimeType || !allowed.includes(realMimeType)) {
     return {
       error:
         kind === "cover"
