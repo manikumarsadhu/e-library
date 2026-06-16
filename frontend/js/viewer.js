@@ -409,3 +409,215 @@ container.addEventListener("touchstart", () => {
 // Load the PDF
 loadPDF();
 showPinchHint();
+
+// --- AI Reading Assistant logic ---
+const aiToggleBtn = document.getElementById("ai-toggle");
+const aiSidebar = document.getElementById("ai-sidebar");
+const aiCloseBtn = document.getElementById("ai-close");
+const aiChatInput = document.getElementById("ai-chat-input");
+const aiSendBtn = document.getElementById("ai-send-btn");
+const aiChatHistory = document.getElementById("ai-chat-history");
+const promptChips = document.querySelectorAll(".prompt-chip");
+
+const chatHistoryMemory = [];
+let isAiResponding = false;
+
+if (aiToggleBtn && aiSidebar && aiCloseBtn) {
+  aiToggleBtn.addEventListener("click", () => {
+    aiSidebar.classList.toggle("collapsed");
+    if (!aiSidebar.classList.contains("collapsed")) {
+      aiChatInput.focus();
+    }
+  });
+
+  aiCloseBtn.addEventListener("click", () => {
+    aiSidebar.classList.add("collapsed");
+  });
+
+  // Auto-resize input textarea
+  aiChatInput.addEventListener("input", () => {
+    aiChatInput.style.height = "auto";
+    aiChatInput.style.height = `${Math.min(aiChatInput.scrollHeight, 120)}px`;
+  });
+
+  // Send on Enter (but new line on Shift+Enter)
+  aiChatInput.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      sendUserMessage();
+    }
+  });
+
+  aiSendBtn.addEventListener("click", () => sendUserMessage());
+
+  promptChips.forEach((chip) => {
+    chip.addEventListener("click", () => {
+      if (isAiResponding) return;
+      const prompt = chip.dataset.prompt;
+      sendUserMessage(prompt);
+    });
+  });
+}
+
+// Extract text from the active page in the viewer
+async function getActivePageText() {
+  if (!pdfDoc) return "";
+  try {
+    const page = await pdfDoc.getPage(currentPage);
+    const textContent = await page.getTextContent();
+    return textContent.items.map((item) => item.str).join(" ");
+  } catch (err) {
+    console.error("Failed to extract page text: ", err);
+    return "";
+  }
+}
+
+// Simple Markdown Formatter for the AI replies
+function formatMarkdown(text) {
+  let html = text
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+
+  // Code blocks: ```code```
+  html = html.replace(/```(\w*)\n([\s\S]*?)```/g, (_, lang, code) => {
+    return `<pre><code class="language-${lang || 'txt'}">${code.trim()}</code></pre>`;
+  });
+
+  // Inline code: `code`
+  html = html.replace(/`([^`\n]+)`/g, '<code>$1</code>');
+
+  // Bold: **text**
+  html = html.replace(/\*\*([\s\S]*?)\*\*/g, '<strong>$1</strong>');
+
+  // Bullet points
+  let lines = html.split("\n");
+  let inList = false;
+  let resultLines = [];
+
+  for (let i = 0; i < lines.length; i++) {
+    let line = lines[i].trim();
+    if (line.startsWith("- ") || line.startsWith("* ")) {
+      if (!inList) {
+        resultLines.push("<ul>");
+        inList = true;
+      }
+      resultLines.push(`<li>${line.substring(2)}</li>`);
+    } else {
+      if (inList) {
+        resultLines.push("</ul>");
+        inList = false;
+      }
+      resultLines.push(lines[i]);
+    }
+  }
+  if (inList) {
+    resultLines.push("</ul>");
+  }
+
+  html = resultLines.join("\n");
+
+  // Paragraphs
+  let paragraphs = html.split(/\n{2,}/);
+  html = paragraphs.map((p) => {
+    let trimmed = p.trim();
+    if (!trimmed) return "";
+    if (trimmed.startsWith("<ul>") || trimmed.startsWith("<pre>") || trimmed.startsWith("<li>")) {
+      return trimmed;
+    }
+    return `<p>${trimmed.replace(/\n/g, "<br>")}</p>`;
+  }).join("");
+
+  return html;
+}
+
+function appendMessage(role, text, isHtml = false) {
+  const msgDiv = document.createElement("div");
+  msgDiv.className = `chat-message ${role}`;
+  if (isHtml) {
+    msgDiv.innerHTML = text;
+  } else {
+    msgDiv.textContent = text;
+  }
+  aiChatHistory.appendChild(msgDiv);
+  aiChatHistory.scrollTop = aiChatHistory.scrollHeight;
+  return msgDiv;
+}
+
+async function sendUserMessage(customPrompt = null) {
+  if (isAiResponding) return;
+
+  const promptText = (customPrompt || aiChatInput.value || "").trim();
+  if (!promptText) return;
+
+  // Clear input
+  if (!customPrompt) {
+    aiChatInput.value = "";
+    aiChatInput.style.height = "38px";
+  }
+
+  // Display user message
+  appendMessage("user", promptText);
+
+  // Disable controls during API call
+  isAiResponding = true;
+  aiSendBtn.disabled = true;
+  aiChatInput.disabled = true;
+
+  // Display loading indicator
+  const loadingMsg = appendMessage("ai loading-dots", "Thinking...");
+
+  try {
+    const pageText = await getActivePageText();
+    
+    // Call serverless /api/ai/chat route
+    const response = await fetch("/api/ai/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        prompt: promptText,
+        pageContext: pageText,
+        pageNumber: currentPage,
+        bookTitle: docTitle,
+        history: chatHistoryMemory
+      })
+    });
+
+    if (!response.ok) {
+      throw new Error(`Server returned status ${response.status}`);
+    }
+
+    // Remove loading indicator
+    loadingMsg.remove();
+
+    // Create a new message container for the streaming output
+    const responseMsg = appendMessage("ai", "", true);
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let accumulatedText = "";
+
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      accumulatedText += decoder.decode(value, { stream: true });
+      responseMsg.innerHTML = formatMarkdown(accumulatedText);
+      aiChatHistory.scrollTop = aiChatHistory.scrollHeight;
+    }
+
+    // Add to conversation memory
+    chatHistoryMemory.push({ role: "user", text: promptText });
+    chatHistoryMemory.push({ role: "assistant", text: accumulatedText });
+
+  } catch (err) {
+    console.error("AI chat request failed:", err);
+    loadingMsg.remove();
+    appendMessage("ai error", "Sorry, I encountered an error while processing your request. Please check that your Gemini API key is configured correctly.");
+  } finally {
+    isAiResponding = false;
+    aiSendBtn.disabled = false;
+    aiChatInput.disabled = false;
+    aiChatInput.focus();
+  }
+}
+

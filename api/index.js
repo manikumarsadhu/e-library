@@ -11,6 +11,7 @@ import { parseCloudinaryKey } from "./lib/cloudinary.js";
 import { uploadAsset } from "./lib/multipart.js";
 import { healthCheck } from "./lib/health.js";
 import { checkRateLimit } from "./lib/rate-limit.js";
+import { handleChatRoute } from "./lib/ai.js";
 
 function parsePositiveInt(value, fallback) {
   const num = Number.parseInt(value ?? "", 10);
@@ -88,7 +89,13 @@ export default async function handler(req, res) {
       return res.redirect(302, parsed.url);
     }
 
+    if (method === "POST" && parts[0] === "api" && parts[1] === "ai" && parts[2] === "chat" && parts.length === 3) {
+      if (applyRateLimit(req, res, "ai-chat")) return;
+      return await handleChatRoute(req, res);
+    }
+
     const needsAuth = method === "POST" || method === "PATCH" || method === "DELETE";
+
     if (needsAuth && !requireAuth(req)) {
       return res.status(401).json({ error: "Unauthorized" });
     }
