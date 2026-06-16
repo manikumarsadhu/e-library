@@ -4,6 +4,9 @@ dist/
 Thumbs.db
 .vscode/
 .env
+.env.local
+.env.development
+.env.production
 .vercel/
 *.log
 frontend/js/config.local.js

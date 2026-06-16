@@ -139,8 +139,34 @@ export default async function handler(req, res) {
     return res.status(404).json({ error: "Not found" });
   } catch (err) {
     console.error(err);
-    const message = err instanceof Error ? err.message : "Internal server error";
-    const status = message.includes("not configured") ? 503 : 500;
+    const rawMessage = err instanceof Error ? err.message : "";
+    
+    // Define a list of safe client validation messages
+    const safeMessages = [
+      "title and author are required",
+      "title and author cannot be empty",
+      "title and author must not exceed 255 characters",
+      "year must be an integer between 1000 and 2100",
+      "Content-Type must be multipart/form-data",
+      "file field is required",
+      "Cover must be JPEG, PNG, WebP, or GIF",
+      "File must be PDF or an image",
+      "Book not found"
+    ];
+    
+    const isProduction = process.env.NODE_ENV === "production";
+    let message = "Internal server error";
+    let status = 500;
+    
+    if (rawMessage.includes("not configured")) {
+      message = "Service is temporarily unavailable";
+      status = 503;
+    } else if (safeMessages.includes(rawMessage) || !isProduction) {
+      message = rawMessage || "Internal server error";
+      if (rawMessage === "Book not found") status = 404;
+      else if (safeMessages.includes(rawMessage)) status = 400;
+    }
+    
     return res.status(status).json({ error: message });
   }
 }

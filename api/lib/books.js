@@ -87,14 +87,30 @@ export async function getBook(id) {
 
 export async function createBook(body) {
   const { title, author, year } = body || {};
-  if (!title?.trim() || !author?.trim()) {
+  if (typeof title !== "string" || typeof author !== "string") {
     throw new Error("title and author are required");
+  }
+  const trimmedTitle = title.trim();
+  const trimmedAuthor = author.trim();
+  if (!trimmedTitle || !trimmedAuthor) {
+    throw new Error("title and author are required");
+  }
+  if (trimmedTitle.length > 255 || trimmedAuthor.length > 255) {
+    throw new Error("title and author must not exceed 255 characters");
+  }
+  let validYear = null;
+  if (year !== undefined && year !== null && year !== "") {
+    const numYear = Number(year);
+    if (!Number.isInteger(numYear) || numYear < 1000 || numYear > 2100) {
+      throw new Error("year must be an integer between 1000 and 2100");
+    }
+    validYear = numYear;
   }
   const id = crypto.randomUUID();
   const db = getDb();
   await db.execute(
     `INSERT INTO books (id, title, author, year) VALUES (?, ?, ?, ?)`,
-    [id, title.trim(), author.trim(), year || null]
+    [id, trimmedTitle, trimmedAuthor, validYear]
   );
   return getBook(id);
 }
@@ -103,18 +119,46 @@ export async function updateBook(id, body) {
   const existing = await getBook(id);
   if (!existing) return null;
 
-  const title = body.title !== undefined ? body.title.trim() : existing.title;
-  const author = body.author !== undefined ? body.author.trim() : existing.author;
-  const year = body.year !== undefined ? body.year : existing.year;
+  let title = existing.title;
+  let author = existing.author;
+  let year = existing.year;
 
-  if (!title || !author) {
-    throw new Error("title and author cannot be empty");
+  if (body.title !== undefined) {
+    if (typeof body.title !== "string" || !body.title.trim()) {
+      throw new Error("title and author cannot be empty");
+    }
+    title = body.title.trim();
+    if (title.length > 255) {
+      throw new Error("title and author must not exceed 255 characters");
+    }
+  }
+
+  if (body.author !== undefined) {
+    if (typeof body.author !== "string" || !body.author.trim()) {
+      throw new Error("title and author cannot be empty");
+    }
+    author = body.author.trim();
+    if (author.length > 255) {
+      throw new Error("title and author must not exceed 255 characters");
+    }
+  }
+
+  if (body.year !== undefined) {
+    if (body.year !== null && body.year !== "") {
+      const numYear = Number(body.year);
+      if (!Number.isInteger(numYear) || numYear < 1000 || numYear > 2100) {
+        throw new Error("year must be an integer between 1000 and 2100");
+      }
+      year = numYear;
+    } else {
+      year = null;
+    }
   }
 
   const db = getDb();
   await db.execute(
     `UPDATE books SET title = ?, author = ?, year = ? WHERE id = ?`,
-    [title, author, year || null, id]
+    [title, author, year, id]
   );
   return getBook(id);
 }
