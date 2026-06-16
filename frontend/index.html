@@ -11,7 +11,7 @@
     <header class="site-header">
       <div class="container">
         <h1>E-Library</h1>
-        <p class="tagline">Browse, borrow, and manage your digital collection</p>
+        <p class="tagline">Browse and manage your digital collection</p>
       </div>
     </header>
 
@@ -22,7 +22,7 @@
           <input
             type="search"
             id="search"
-            placeholder="Search by title or author…"
+            placeholder="Search by title, author, or year…"
             autocomplete="off"
           />
         </div>
@@ -31,9 +31,11 @@
           <input
             type="password"
             id="api-key"
-            placeholder="Required for add / edit / delete"
+            placeholder="Required for add, edit, and delete"
             autocomplete="off"
+            aria-describedby="api-key-error"
           />
+          <p id="api-key-error" class="input-error" role="alert" aria-live="polite"></p>
         </div>
       </section>
 
@@ -61,11 +63,25 @@
           </div>
           <div class="form-row">
             <label for="cover">Cover image (optional)</label>
-            <input type="file" id="cover" name="cover" accept="image/jpeg,image/png,image/webp,image/gif" />
+            <input
+              type="file"
+              id="cover"
+              name="cover"
+              accept="image/jpeg,image/png,image/webp,image/gif"
+              aria-describedby="cover-help"
+            />
+            <p id="cover-help" class="input-help">JPEG, PNG, WebP, or GIF.</p>
           </div>
           <div class="form-row">
             <label for="pdf">PDF file (optional)</label>
-            <input type="file" id="pdf" name="pdf" accept="application/pdf" />
+            <input
+              type="file"
+              id="pdf"
+              name="pdf"
+              accept="application/pdf"
+              aria-describedby="pdf-help"
+            />
+            <p id="pdf-help" class="input-help">Upload a PDF to enable the in-browser reader.</p>
           </div>
           <div class="form-actions">
             <button type="submit" class="btn btn-primary">Add book</button>
@@ -80,13 +96,71 @@
           <p id="book-count" class="book-count" aria-live="polite"></p>
         </div>
         <p id="status-message" class="status-message" role="status" aria-live="polite"></p>
+        <button id="retry-load" class="btn btn-secondary retry-btn" type="button" hidden>Retry</button>
         <div id="book-list" class="book-list" role="list"></div>
+        <div id="pager" class="pager" aria-label="Pagination">
+          <button id="prev-page" class="btn btn-secondary" type="button">Previous</button>
+          <span id="page-label" class="page-label">Page 1</span>
+          <button id="next-page" class="btn btn-secondary" type="button">Next</button>
+        </div>
       </section>
     </main>
 
+    <dialog id="edit-modal" class="edit-modal" aria-labelledby="edit-heading">
+      <form id="edit-form" class="edit-form" method="dialog">
+        <h2 id="edit-heading">Edit book</h2>
+        <input type="hidden" id="edit-id" name="id" />
+        <div class="form-row">
+          <label for="edit-title">Title</label>
+          <input type="text" id="edit-title" name="title" required maxlength="255" />
+        </div>
+        <div class="form-row">
+          <label for="edit-author">Author</label>
+          <input type="text" id="edit-author" name="author" required maxlength="255" />
+        </div>
+        <div class="form-row">
+          <label for="edit-year">Year</label>
+          <input
+            type="number"
+            id="edit-year"
+            name="year"
+            min="1000"
+            max="2100"
+            placeholder="e.g. 2020"
+          />
+        </div>
+        <div class="form-row">
+          <label for="edit-cover">Replace cover image (optional)</label>
+          <input
+            type="file"
+            id="edit-cover"
+            name="cover"
+            accept="image/jpeg,image/png,image/webp,image/gif"
+            aria-describedby="edit-cover-help"
+          />
+          <p id="edit-cover-help" class="input-help">Leave empty to keep existing cover.</p>
+        </div>
+        <div class="form-row">
+          <label for="edit-pdf">Replace PDF file (optional)</label>
+          <input
+            type="file"
+            id="edit-pdf"
+            name="pdf"
+            accept="application/pdf"
+            aria-describedby="edit-pdf-help"
+          />
+          <p id="edit-pdf-help" class="input-help">Leave empty to keep existing file.</p>
+        </div>
+        <div class="form-actions">
+          <button type="submit" class="btn btn-primary">Save changes</button>
+          <button type="button" id="edit-cancel" class="btn btn-secondary">Cancel</button>
+        </div>
+      </form>
+    </dialog>
+
     <footer class="site-footer">
       <div class="container">
-        <p>E-Library &mdash; GitHub Pages + Cloudflare Workers + TiDB + R2</p>
+        <p>&copy; <span id="footer-year"></span> E-Library. Developed by Mani Kumar Sadhu.</p>
       </div>
     </footer>
 

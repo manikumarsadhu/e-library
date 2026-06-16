@@ -7,7 +7,8 @@
     "dev": "node dev-server.js",
     "deploy": "vercel deploy --prod",
     "lint": "eslint api/ frontend/js/ dev-server.js",
-    "lint:fix": "eslint api/ frontend/js/ dev-server.js --fix"
+    "lint:fix": "eslint api/ frontend/js/ dev-server.js --fix",
+    "test": "node --test tests/auth.test.js tests/books.test.js tests/search.test.js"
   },
   "dependencies": {
     "@tidbcloud/serverless": "^0.2.0",

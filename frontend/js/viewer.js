@@ -24,15 +24,23 @@ const resumeToast = document.getElementById("resume-toast");
 const resumeMsg = document.getElementById("resume-msg");
 const resumeYesBtn = document.getElementById("resume-yes");
 const resumeNoBtn = document.getElementById("resume-no");
+const pinchHintEl = document.getElementById("pinch-hint");
 
 let pdfDoc = null;
 let currentScale = 1.25;
 let pageContainers = [];
 let currentPage = 1;
+const renderedPages = new Set();
+const isMobileViewport = () => window.matchMedia("(max-width: 640px)").matches;
+let isPinching = false;
+let pinchStartDistance = 0;
+let pinchStartScale = currentScale;
+let lastPinchRerenderAt = 0;
 
 // Storage keys
 const THEME_STORAGE_KEY = "elibrary_viewer_theme";
 const LAST_READ_PREFIX = "elibrary_last_read_";
+const PINCH_HINT_DISMISSED_KEY = "elibrary_pinch_hint_dismissed";
 
 // Disable context menu
 document.addEventListener("contextmenu", (e) => e.preventDefault());
@@ -91,7 +99,6 @@ document.addEventListener("fullscreenchange", () => {
   updateFullscreenIcon(!!document.fullscreenElement);
 });
 
-// Scroll / IntersectionObserver to track visible page
 const pageObserver = new IntersectionObserver((entries) => {
   entries.forEach((entry) => {
     if (entry.isIntersecting) {
@@ -99,11 +106,12 @@ const pageObserver = new IntersectionObserver((entries) => {
       currentPage = pageNum;
       updatePageIndicator();
       saveLastReadPage(pageNum);
+      ensurePageRangeRendered(pageNum);
     }
   });
 }, {
   root: container,
-  threshold: 0.4 // Page is active when 40% visible in view
+  threshold: 0.4,
 });
 
 function updatePageIndicator() {
@@ -127,11 +135,9 @@ async function loadPDF() {
     const loadingTask = pdfjsLib.getDocument(fileUrl);
     pdfDoc = await loadingTask.promise;
     loadingEl.remove();
+    buildPagePlaceholders();
     updatePageIndicator();
-    
-    await renderAllPages();
-    
-    // Check for saved progress after pages are created
+    ensurePageRangeRendered(1);
     checkSavedProgress();
   } catch (err) {
     console.error("Error loading PDF:", err);
@@ -139,54 +145,55 @@ async function loadPDF() {
   }
 }
 
-async function renderAllPages() {
-  // Disconnect observer first
+function buildPagePlaceholders() {
   pageObserver.disconnect();
-  
   container.innerHTML = "";
   pageContainers = [];
-  
+  renderedPages.clear();
+
   for (let i = 1; i <= pdfDoc.numPages; i++) {
     const pageDiv = document.createElement("div");
     pageDiv.className = "page-container";
     pageDiv.dataset.pageNumber = i;
+    pageDiv.innerHTML = `<div class="spinner"></div>`;
     container.appendChild(pageDiv);
     pageContainers.push(pageDiv);
-    
-    // Observe this page container
     pageObserver.observe(pageDiv);
-    
-    // Start page rendering
-    await renderPage(i, pageDiv);
+  }
+}
+
+function ensurePageRangeRendered(centerPage) {
+  for (let pageNum = centerPage - 1; pageNum <= centerPage + 1; pageNum += 1) {
+    if (pageNum < 1 || pageNum > pageContainers.length) continue;
+    if (!renderedPages.has(pageNum)) {
+      renderedPages.add(pageNum);
+      void renderPage(pageNum, pageContainers[pageNum - 1]);
+    }
   }
 }
 
 async function renderPage(pageNum, pageDiv) {
   try {
     const page = await pdfDoc.getPage(pageNum);
-    
     pageDiv.innerHTML = "";
     const viewport = page.getViewport({ scale: currentScale });
-    
     const canvas = document.createElement("canvas");
     canvas.width = viewport.width;
     canvas.height = viewport.height;
     pageDiv.appendChild(canvas);
-    
     const context = canvas.getContext("2d");
     const renderContext = {
       canvasContext: context,
       viewport: viewport,
     };
-    
     await page.render(renderContext).promise;
-    
+
     const textLayerDiv = document.createElement("div");
     textLayerDiv.className = "textLayer";
     textLayerDiv.style.width = `${viewport.width}px`;
     textLayerDiv.style.height = `${viewport.height}px`;
     pageDiv.appendChild(textLayerDiv);
-    
+
     const textContent = await page.getTextContent();
     await pdfjsLib.renderTextLayer({
       textContentSource: textContent,
@@ -194,8 +201,8 @@ async function renderPage(pageNum, pageDiv) {
       viewport: viewport,
       textDivs: [],
     }).promise;
-    
   } catch (err) {
+    renderedPages.delete(pageNum);
     console.error(`Error rendering page ${pageNum}:`, err);
   }
 }
@@ -213,6 +220,7 @@ function checkSavedProgress() {
       resumeYesBtn.onclick = () => {
         resumeToast.classList.add("hidden");
         scrollToPage(pageNum);
+        ensurePageRangeRendered(pageNum);
       };
       
       resumeNoBtn.onclick = () => {
@@ -234,23 +242,55 @@ function scrollToPage(pageNum) {
   }
 }
 
+function rerenderAroundCurrentPage() {
+  buildPagePlaceholders();
+  scrollToPage(currentPage);
+  ensurePageRangeRendered(currentPage);
+}
+
+function shouldShowPinchHint() {
+  if (!isMobileViewport()) return false;
+  return localStorage.getItem(PINCH_HINT_DISMISSED_KEY) !== "1";
+}
+
+function hidePinchHint() {
+  if (!pinchHintEl) return;
+  pinchHintEl.classList.add("hidden");
+  localStorage.setItem(PINCH_HINT_DISMISSED_KEY, "1");
+}
+
+function showPinchHint() {
+  if (!pinchHintEl || !shouldShowPinchHint()) return;
+  pinchHintEl.classList.remove("hidden");
+  setTimeout(() => {
+    if (pinchHintEl.classList.contains("hidden")) return;
+    hidePinchHint();
+  }, 6000);
+}
+
+function distanceBetweenTouches(touchA, touchB) {
+  const dx = touchA.clientX - touchB.clientX;
+  const dy = touchA.clientY - touchB.clientY;
+  return Math.hypot(dx, dy);
+}
+
+function getZoomStep() {
+  return isMobileViewport() ? 0.1 : 0.25;
+}
+
 // Zoom Handlers
 zoomInBtn.addEventListener("click", () => {
   if (currentScale >= 3.0) return;
-  currentScale += 0.25;
+  currentScale += getZoomStep();
   zoomValEl.textContent = `${Math.round(currentScale * 100)}%`;
-  renderAllPages().then(() => {
-    scrollToPage(currentPage);
-  });
+  rerenderAroundCurrentPage();
 });
 
 zoomOutBtn.addEventListener("click", () => {
   if (currentScale <= 0.5) return;
-  currentScale -= 0.25;
+  currentScale -= getZoomStep();
   zoomValEl.textContent = `${Math.round(currentScale * 100)}%`;
-  renderAllPages().then(() => {
-    scrollToPage(currentPage);
-  });
+  rerenderAroundCurrentPage();
 });
 
 zoomFitBtn.addEventListener("click", () => {
@@ -258,15 +298,70 @@ zoomFitBtn.addEventListener("click", () => {
   
   pdfDoc.getPage(1).then((page) => {
     const originalViewport = page.getViewport({ scale: 1.0 });
-    const containerWidth = container.clientWidth - 80;
+    const styles = window.getComputedStyle(container);
+    const horizontalPadding =
+      parseFloat(styles.paddingLeft || "0") + parseFloat(styles.paddingRight || "0");
+    const mobileGutter = isMobileViewport() ? 16 : 32;
+    const containerWidth = container.clientWidth - horizontalPadding - mobileGutter;
     currentScale = containerWidth / originalViewport.width;
     currentScale = Math.min(Math.max(currentScale, 0.5), 3.0);
     zoomValEl.textContent = `${Math.round(currentScale * 100)}%`;
-    renderAllPages().then(() => {
-      scrollToPage(currentPage);
-    });
+    rerenderAroundCurrentPage();
   });
 });
 
+container.addEventListener("touchstart", (event) => {
+  if (event.touches.length !== 2) return;
+  hidePinchHint();
+  isPinching = true;
+  pinchStartDistance = distanceBetweenTouches(event.touches[0], event.touches[1]);
+  pinchStartScale = currentScale;
+}, { passive: true });
+
+container.addEventListener("touchmove", (event) => {
+  if (!isPinching || event.touches.length !== 2) return;
+  event.preventDefault();
+  const currentDistance = distanceBetweenTouches(event.touches[0], event.touches[1]);
+  if (!pinchStartDistance) return;
+
+  const scaleRatio = currentDistance / pinchStartDistance;
+  const nextScale = Math.min(Math.max(pinchStartScale * scaleRatio, 0.5), 3.0);
+  if (Math.abs(nextScale - currentScale) < 0.01) return;
+
+  currentScale = nextScale;
+  zoomValEl.textContent = `${Math.round(currentScale * 100)}%`;
+
+  const now = Date.now();
+  if (now - lastPinchRerenderAt > 120) {
+    rerenderAroundCurrentPage();
+    lastPinchRerenderAt = now;
+  }
+}, { passive: false });
+
+container.addEventListener("touchend", (event) => {
+  if (!isPinching) return;
+  if (event.touches.length >= 2) return;
+  isPinching = false;
+  pinchStartDistance = 0;
+  pinchStartScale = currentScale;
+  rerenderAroundCurrentPage();
+}, { passive: true });
+
+container.addEventListener("touchcancel", () => {
+  if (!isPinching) return;
+  isPinching = false;
+  pinchStartDistance = 0;
+  pinchStartScale = currentScale;
+  rerenderAroundCurrentPage();
+}, { passive: true });
+
+pinchHintEl?.addEventListener("click", hidePinchHint);
+container.addEventListener("touchstart", () => {
+  if (pinchHintEl && !pinchHintEl.classList.contains("hidden")) {
+    hidePinchHint();
+  }
+}, { passive: true });
+
 // Load the PDF
 loadPDF();
+showPinchHint();

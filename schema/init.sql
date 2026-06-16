@@ -6,7 +6,6 @@ CREATE TABLE IF NOT EXISTS books (
   title         VARCHAR(255) NOT NULL,
   author        VARCHAR(255) NOT NULL,
   year          INT UNSIGNED,
-  status        ENUM('available', 'on_loan') NOT NULL DEFAULT 'available',
   cover_key     VARCHAR(512) NULL,
   file_key      VARCHAR(512) NULL,
   created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -16,8 +15,8 @@ CREATE TABLE IF NOT EXISTS books (
 );
 
 -- Optional seed data (remove if you prefer an empty library)
-INSERT INTO books (id, title, author, year, status) VALUES
-  ('a1000001-0000-4000-8000-000000000001', 'The Great Gatsby', 'F. Scott Fitzgerald', 1925, 'available'),
-  ('a1000001-0000-4000-8000-000000000002', 'To Kill a Mockingbird', 'Harper Lee', 1960, 'available'),
-  ('a1000001-0000-4000-8000-000000000003', '1984', 'George Orwell', 1949, 'on_loan')
+INSERT INTO books (id, title, author, year) VALUES
+  ('a1000001-0000-4000-8000-000000000001', 'The Great Gatsby', 'F. Scott Fitzgerald', 1925),
+  ('a1000001-0000-4000-8000-000000000002', 'To Kill a Mockingbird', 'Harper Lee', 1960),
+  ('a1000001-0000-4000-8000-000000000003', '1984', 'George Orwell', 1949)
 ON DUPLICATE KEY UPDATE title = VALUES(title);
