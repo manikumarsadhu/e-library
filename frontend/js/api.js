@@ -61,17 +61,35 @@ export async function validateApiKey(key) {
   }
 }
 
-export async function fetchBooks(query = "") {
+export async function fetchBooks(query = "", page = 1, limit = 20) {
   const url = new URL(`${API_BASE_URL}/api/books`);
   if (query.trim()) url.searchParams.set("q", query.trim());
+  url.searchParams.set("page", String(page));
+  url.searchParams.set("limit", String(limit));
   const res = await fetch(url.toString(), { headers: headers() });
   const data = await parseResponse(res);
-  return data.books || [];
+  return {
+    books: data.books || [],
+    total: Number(data.total || 0),
+    page: Number(data.page || page),
+    limit: Number(data.limit || limit),
+    pages: Number(data.pages || 1),
+  };
 }
 
 export async function createBook(payload) {
   const res = await fetch(`${API_BASE_URL}/api/books`, {
     method: "POST",
+    headers: { ...headers(true), "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  const data = await parseResponse(res);
+  return data.book;
+}
+
+export async function updateBook(id, payload) {
+  const res = await fetch(`${API_BASE_URL}/api/books/${id}`, {
+    method: "PATCH",
     headers: { ...headers(true), "Content-Type": "application/json" },
     body: JSON.stringify(payload),
   });

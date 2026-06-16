@@ -1,6 +1,6 @@
 # E-Library
 
-A simple full-stack digital library: browse books, borrow/return, upload covers and PDFs.
+A simple full-stack digital library: browse books, read PDFs, and upload covers and files.
 
 | Layer | Technology |
 |-------|------------|
@@ -32,7 +32,8 @@ e-library/
 
 1. Create a TiDB Cloud cluster and database (e.g. `e_library`).
 2. Open the SQL editor and run [`schema/init.sql`](schema/init.sql).
-3. Note **host**, **user**, **password**, and **database** name.
+3. If you previously deployed an older schema with a `status` column, run [`schema/migrations/001_drop_status.sql`](schema/migrations/001_drop_status.sql).
+4. Note **host**, **user**, **password**, and **database** name.
 
 ## 2. Cloudinary Setup
 
@@ -41,7 +42,7 @@ e-library/
 
 ## 3. Environment Variables Configuration
 
-Copy environment variables template (or create a `.env` file at the root) for local development:
+Copy [.env.example](.env.example) to `.env` and fill values:
 
 ```env
 TIDB_HOST=your-tidb-host
@@ -52,6 +53,7 @@ API_KEY=your-custom-admin-api-key
 CLOUDINARY_CLOUD_NAME=your-cloudinary-cloud-name
 CLOUDINARY_API_KEY=your-cloudinary-api-key
 CLOUDINARY_API_SECRET=your-cloudinary-api-secret
+RATE_LIMIT_PER_MIN=120
 ```
 
 Configure these same environment variables in your Vercel project dashboard under **Project Settings > Environment Variables**.
@@ -64,7 +66,7 @@ Install dependencies at the root:
 npm install
 ```
 
-Start the Vercel local development server:
+Start the custom local development server:
 
 ```bash
 npm run dev
@@ -76,21 +78,24 @@ This will start a dev server (typically at `http://localhost:3000`) serving both
 
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
-| GET | `/api/books?q=` | No | List/search books |
+| GET | `/api/health` | No | Readiness check for DB and storage config |
+| GET | `/api/books?q=&page=&limit=` | No | List/search books with pagination |
 | GET | `/api/books/:id` | No | Get one book |
 | POST | `/api/books` | Bearer | Create book (JSON) |
-| PATCH | `/api/books/:id` | Bearer | Update metadata/status |
+| PATCH | `/api/books/:id` | Bearer | Update metadata |
 | DELETE | `/api/books/:id` | Bearer | Delete book + Cloudinary assets |
 | POST | `/api/books/:id/cover` | Bearer | Upload cover (`multipart`, field `file`) |
 | POST | `/api/books/:id/file` | Bearer | Upload PDF/file (`multipart`, field `file`) |
-| GET | `/api/files/:key` | No | Redirect to the Cloudinary URL |
+| GET | `/api/files/:key` | No | Redirect to Cloudinary file URL |
 
-If `API_KEY` is not set on the Vercel deployment, write endpoints are open.
+In production (`NODE_ENV=production`), write endpoints require `API_KEY`.
 
 ## Security notes
 
 - Never commit database credentials or Cloudinary secrets. Keep them in Vercel dashboard and local `.env`.
 - Use `API_KEY` in production and share it only with admins.
+- Viewer download/print shortcut blocking is a UX guard only, not copy protection.
+- `RATE_LIMIT_PER_MIN` enables best-effort per-instance rate limiting on list/file endpoints.
 
 ## License
 

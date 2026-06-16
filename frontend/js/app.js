@@ -1,6 +1,7 @@
 import {
   fetchBooks,
   createBook,
+  updateBook,
   deleteBook,
   uploadCover,
   uploadFile,
@@ -15,14 +16,36 @@ const bookCount = document.getElementById("book-count");
 const statusMessage = document.getElementById("status-message");
 const searchInput = document.getElementById("search");
 const apiKeyInput = document.getElementById("api-key");
+const apiKeyError = document.getElementById("api-key-error");
+const footerYear = document.getElementById("footer-year");
 const addForm = document.getElementById("add-form");
+const pager = document.getElementById("pager");
+const retryLoadBtn = document.getElementById("retry-load");
+const prevPageBtn = document.getElementById("prev-page");
+const nextPageBtn = document.getElementById("next-page");
+const pageLabel = document.getElementById("page-label");
+const editModal = document.getElementById("edit-modal");
+const editForm = document.getElementById("edit-form");
+const editCancelBtn = document.getElementById("edit-cancel");
+const editIdInput = document.getElementById("edit-id");
+const editTitleInput = document.getElementById("edit-title");
+const editAuthorInput = document.getElementById("edit-author");
+const editYearInput = document.getElementById("edit-year");
+const editCoverInput = document.getElementById("edit-cover");
+const editPdfInput = document.getElementById("edit-pdf");
 
 let allBooks = [];
 let searchDebounce = null;
+let currentPage = 1;
+const pageSize = 20;
+let totalPages = 1;
+let lastFocusEl = null;
+const supportsDialog = typeof editModal.showModal === "function";
 
 function setStatus(message, type = "") {
   statusMessage.textContent = message;
   statusMessage.className = `status-message${type ? ` ${type}` : ""}`;
+  retryLoadBtn.hidden = type !== "error";
 }
 
 function createEl(tag, className, text) {
@@ -94,6 +117,11 @@ function renderBookCard(book) {
     actions.appendChild(readBtn);
   }
 
+  const editBtn = createEl("button", "btn btn-secondary", "Edit");
+  editBtn.type = "button";
+  editBtn.dataset.action = "edit";
+  actions.appendChild(editBtn);
+
   const deleteBtn = createEl("button", "btn btn-danger", "Delete");
   deleteBtn.type = "button";
   deleteBtn.dataset.action = "delete";
@@ -104,31 +132,81 @@ function renderBookCard(book) {
   return card;
 }
 
-function renderBooks(books) {
+function renderBooks(books, total) {
   bookList.replaceChildren();
   if (books.length === 0) {
     bookList.appendChild(createEl("p", "empty-state", "No books found."));
   } else {
     books.forEach((book) => bookList.appendChild(renderBookCard(book)));
   }
-  const total = allBooks.length;
   const showing = books.length;
-  bookCount.textContent =
-    total === showing
-      ? `${total} book${total === 1 ? "" : "s"}`
-      : `Showing ${showing} of ${total} books`;
+  bookCount.textContent = `Page ${currentPage} of ${totalPages} (${total} total, ${showing} shown)`;
+  pageLabel.textContent = `Page ${currentPage}`;
+  prevPageBtn.disabled = currentPage <= 1;
+  nextPageBtn.disabled = currentPage >= totalPages;
+  pager.hidden = totalPages <= 1;
+}
+
+function setApiKeyError(message) {
+  apiKeyError.textContent = message;
+  const hasError = Boolean(message);
+  apiKeyInput.setAttribute("aria-invalid", hasError ? "true" : "false");
+}
+
+function getCurrentBook(id) {
+  return allBooks.find((b) => b.id === id);
+}
+
+function openEditModal(book) {
+  if (!book) return;
+  lastFocusEl = document.activeElement;
+  editIdInput.value = book.id;
+  editTitleInput.value = book.title || "";
+  editAuthorInput.value = book.author || "";
+  editYearInput.value = book.year || "";
+  editCoverInput.value = "";
+  editPdfInput.value = "";
+  document.body.classList.add("modal-open");
+  if (supportsDialog) {
+    editModal.showModal();
+  } else {
+    editModal.setAttribute("open", "");
+    editModal.classList.add("fallback-open");
+  }
+  editTitleInput.focus();
+}
+
+function closeEditModal() {
+  if (supportsDialog) {
+    editModal.close();
+  } else {
+    editModal.removeAttribute("open");
+    editModal.classList.remove("fallback-open");
+  }
+  document.body.classList.remove("modal-open");
+  if (lastFocusEl && typeof lastFocusEl.focus === "function") {
+    lastFocusEl.focus();
+  }
 }
 
 async function loadBooks() {
   setStatus("Loading…");
   try {
     const query = searchInput.value;
-    allBooks = await fetchBooks(query);
-    renderBooks(allBooks);
+    const response = await fetchBooks(query, currentPage, pageSize);
+    if (currentPage > response.pages) {
+      currentPage = response.pages;
+      return loadBooks();
+    }
+    allBooks = response.books;
+    totalPages = response.pages;
+    renderBooks(allBooks, response.total);
     setStatus("");
   } catch (err) {
     setStatus(err.message || "Failed to load books", "error");
-    renderBooks([]);
+    allBooks = [];
+    totalPages = 1;
+    renderBooks([], 0);
   }
 }
 
@@ -156,8 +234,13 @@ bookList.addEventListener("click", async (e) => {
     return;
   }
 
+  if (btn.dataset.action === "edit") {
+    openEditModal(getCurrentBook(id));
+    return;
+  }
+
   if (btn.dataset.action === "delete") {
-    const book = allBooks.find((b) => b.id === id);
+    const book = getCurrentBook(id);
     const label = book ? `"${book.title}"` : "this book";
     if (!confirm(`Delete ${label}? This cannot be undone.`)) return;
 
@@ -191,10 +274,16 @@ addForm.addEventListener("submit", async (e) => {
   setStatus("Adding book…");
   try {
     const book = await createBook({ title, author, year });
-    if (coverFile) await uploadCover(book.id, coverFile);
-    if (pdfFile) await uploadFile(book.id, pdfFile);
+    try {
+      if (coverFile) await uploadCover(book.id, coverFile);
+      if (pdfFile) await uploadFile(book.id, pdfFile);
+    } catch (uploadErr) {
+      await deleteBook(book.id).catch(() => {});
+      throw new Error(`Upload failed — book was not saved. ${uploadErr.message}`);
+    }
     addForm.reset();
     setStatus("Book added.", "success");
+    currentPage = 1;
     await loadBooks();
   } catch (err) {
     setStatus(err.message, "error");
@@ -203,7 +292,10 @@ addForm.addEventListener("submit", async (e) => {
 
 searchInput.addEventListener("input", () => {
   clearTimeout(searchDebounce);
-  searchDebounce = setTimeout(loadBooks, 300);
+  searchDebounce = setTimeout(() => {
+    currentPage = 1;
+    loadBooks();
+  }, 300);
 });
 
 let authDebounce = null;
@@ -212,10 +304,12 @@ async function updateAdminUI() {
   const key = getApiKey();
   if (!key) {
     document.body.classList.remove("is-admin");
+    setApiKeyError("");
     return;
   }
   const isValid = await validateApiKey(key);
   document.body.classList.toggle("is-admin", isValid);
+  setApiKeyError(isValid ? "" : "Invalid API key.");
 }
 
 apiKeyInput.addEventListener("input", () => {
@@ -224,13 +318,71 @@ apiKeyInput.addEventListener("input", () => {
   if (!value) {
     clearTimeout(authDebounce);
     document.body.classList.remove("is-admin");
+    setApiKeyError("");
   } else {
     clearTimeout(authDebounce);
     authDebounce = setTimeout(updateAdminUI, 300);
   }
 });
 
+retryLoadBtn.addEventListener("click", () => {
+  setStatus("Retrying…");
+  loadBooks();
+});
+
+prevPageBtn.addEventListener("click", () => {
+  if (currentPage <= 1) return;
+  currentPage -= 1;
+  loadBooks();
+});
+
+nextPageBtn.addEventListener("click", () => {
+  if (currentPage >= totalPages) return;
+  currentPage += 1;
+  loadBooks();
+});
+
+editForm.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const id = editIdInput.value;
+  if (!id) return;
+
+  const title = editTitleInput.value.trim();
+  const author = editAuthorInput.value.trim();
+  const yearVal = editYearInput.value;
+  const year = yearVal ? parseInt(yearVal, 10) : null;
+  const coverFile = editCoverInput.files[0];
+  const pdfFile = editPdfInput.files[0];
+
+  setStatus("Saving changes…");
+  try {
+    await updateBook(id, { title, author, year });
+    if (coverFile) await uploadCover(id, coverFile);
+    if (pdfFile) await uploadFile(id, pdfFile);
+    closeEditModal();
+    setStatus("Book updated.", "success");
+    await loadBooks();
+  } catch (err) {
+    setStatus(err.message, "error");
+  }
+});
+
+editCancelBtn.addEventListener("click", closeEditModal);
+editModal.addEventListener("cancel", (e) => {
+  e.preventDefault();
+  closeEditModal();
+});
+
+if (!supportsDialog) {
+  editModal.addEventListener("click", (e) => {
+    if (e.target === editModal) {
+      closeEditModal();
+    }
+  });
+}
+
 apiKeyInput.value = getApiKey();
 updateAdminUI();
+footerYear.textContent = new Date().getFullYear();
 
 loadBooks();
