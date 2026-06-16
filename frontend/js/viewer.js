@@ -36,6 +36,8 @@ let isPinching = false;
 let pinchStartDistance = 0;
 let pinchStartScale = currentScale;
 let lastPinchRerenderAt = 0;
+let firstPageViewport = null;
+let isZooming = false;
 
 // Storage keys
 const THEME_STORAGE_KEY = "elibrary_viewer_theme";
@@ -100,6 +102,7 @@ document.addEventListener("fullscreenchange", () => {
 });
 
 const pageObserver = new IntersectionObserver((entries) => {
+  if (isZooming) return;
   entries.forEach((entry) => {
     if (entry.isIntersecting) {
       const pageNum = parseInt(entry.target.dataset.pageNumber, 10);
@@ -135,6 +138,15 @@ async function loadPDF() {
     const loadingTask = pdfjsLib.getDocument(fileUrl);
     pdfDoc = await loadingTask.promise;
     loadingEl.remove();
+
+    // Load first page's viewport to establish standard page dimensions
+    try {
+      const firstPage = await pdfDoc.getPage(1);
+      firstPageViewport = firstPage.getViewport({ scale: 1.0 });
+    } catch (e) {
+      console.error("Error loading first page viewport:", e);
+    }
+
     buildPagePlaceholders();
     updatePageIndicator();
     ensurePageRangeRendered(1);
@@ -151,10 +163,15 @@ function buildPagePlaceholders() {
   pageContainers = [];
   renderedPages.clear();
 
+  const width = firstPageViewport ? `${firstPageViewport.width * currentScale}px` : "";
+  const height = firstPageViewport ? `${firstPageViewport.height * currentScale}px` : "";
+
   for (let i = 1; i <= pdfDoc.numPages; i++) {
     const pageDiv = document.createElement("div");
     pageDiv.className = "page-container";
     pageDiv.dataset.pageNumber = i;
+    if (width) pageDiv.style.width = width;
+    if (height) pageDiv.style.height = height;
     pageDiv.innerHTML = `<div class="spinner"></div>`;
     container.appendChild(pageDiv);
     pageContainers.push(pageDiv);
@@ -177,11 +194,22 @@ async function renderPage(pageNum, pageDiv) {
     const page = await pdfDoc.getPage(pageNum);
     pageDiv.innerHTML = "";
     const viewport = page.getViewport({ scale: currentScale });
+    pageDiv.style.width = `${viewport.width}px`;
+    pageDiv.style.height = `${viewport.height}px`;
+    
     const canvas = document.createElement("canvas");
-    canvas.width = viewport.width;
-    canvas.height = viewport.height;
-    pageDiv.appendChild(canvas);
     const context = canvas.getContext("2d");
+    const dpr = window.devicePixelRatio || 1;
+    
+    canvas.width = viewport.width * dpr;
+    canvas.height = viewport.height * dpr;
+    canvas.style.width = `${viewport.width}px`;
+    canvas.style.height = `${viewport.height}px`;
+    
+    pageDiv.appendChild(canvas);
+    
+    context.scale(dpr, dpr);
+    
     const renderContext = {
       canvasContext: context,
       viewport: viewport,
@@ -235,17 +263,33 @@ function checkSavedProgress() {
   }
 }
 
-function scrollToPage(pageNum) {
+function scrollToPage(pageNum, behavior = "smooth") {
   const targetEl = pageContainers[pageNum - 1];
   if (targetEl) {
-    targetEl.scrollIntoView({ behavior: "smooth", block: "start" });
+    targetEl.scrollIntoView({ behavior, block: "start" });
   }
 }
 
+function resetPageContainersForZoom() {
+  renderedPages.clear();
+  const width = firstPageViewport ? `${firstPageViewport.width * currentScale}px` : "";
+  const height = firstPageViewport ? `${firstPageViewport.height * currentScale}px` : "";
+
+  pageContainers.forEach((pageDiv) => {
+    if (width) pageDiv.style.width = width;
+    if (height) pageDiv.style.height = height;
+    pageDiv.innerHTML = `<div class="spinner"></div>`;
+  });
+}
+
 function rerenderAroundCurrentPage() {
-  buildPagePlaceholders();
-  scrollToPage(currentPage);
+  isZooming = true;
+  resetPageContainersForZoom();
+  scrollToPage(currentPage, "auto");
   ensurePageRangeRendered(currentPage);
+  setTimeout(() => {
+    isZooming = false;
+  }, 100);
 }
 
 function shouldShowPinchHint() {
