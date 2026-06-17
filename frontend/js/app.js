@@ -222,7 +222,7 @@ bookList.addEventListener("click", async (e) => {
   if (btn.dataset.action === "preview") {
     const book = allBooks.find((b) => b.id === id);
     if (book && book.file_key) {
-      const viewerUrl = `viewer.html?file=${encodeURIComponent(fileUrl(book.file_key))}&title=${encodeURIComponent(book.title)}`;
+      const viewerUrl = `viewer.html?file=${encodeURIComponent(fileUrl(book.file_key))}&title=${encodeURIComponent(book.title)}&id=${encodeURIComponent(id)}`;
       window.open(viewerUrl, "_blank");
     }
     return;

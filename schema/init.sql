@@ -8,6 +8,7 @@ CREATE TABLE IF NOT EXISTS books (
   year          INT UNSIGNED,
   cover_key     VARCHAR(512) NULL,
   file_key      VARCHAR(512) NULL,
+  outline       TEXT NULL,
   created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   INDEX idx_title (title),

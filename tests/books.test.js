@@ -15,6 +15,7 @@ test("rowToBook keeps expected API shape", () => {
     year: 2020,
     cover_key: "cover",
     file_key: "file",
+    outline: null,
     created_at: "now",
     updated_at: "now",
   };

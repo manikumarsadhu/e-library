@@ -4,7 +4,7 @@ import { getDb, getRows } from "./db.js";
 import { escapeLike } from "./search.js";
 
 const BOOK_COLUMNS =
-  "id, title, author, year, cover_key, file_key, created_at, updated_at";
+  "id, title, author, year, cover_key, file_key, outline, created_at, updated_at";
 
 export function rowToBook(row) {
   return {
@@ -14,6 +14,7 @@ export function rowToBook(row) {
     year: row.year,
     cover_key: row.cover_key,
     file_key: row.file_key,
+    outline: row.outline ?? null,
     created_at: row.created_at,
     updated_at: row.updated_at,
   };
@@ -179,4 +180,30 @@ export async function deleteBook(id) {
   const db = getDb();
   await db.execute(`DELETE FROM books WHERE id = ?`, [id]);
   return true;
+}
+
+export async function getBookOutline(id) {
+  const db = getDb();
+  const result = await db.execute(
+    `SELECT outline FROM books WHERE id = ? LIMIT 1`,
+    [id]
+  );
+  const row = getRows(result)[0];
+  if (!row) return null;
+  const raw = row.outline;
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+}
+
+export async function setBookOutline(id, outlineData) {
+  const db = getDb();
+  const json = JSON.stringify(outlineData);
+  await db.execute(
+    `UPDATE books SET outline = ? WHERE id = ?`,
+    [json, id]
+  );
 }
