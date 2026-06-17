@@ -22,10 +22,6 @@ import { readJsonBody } from "./body.js";
 
 /**
  * Helper to stream completion chunks from Gemini 2.5 Flash.
- * @param {Object} options
- * @param {string|Array} options.contents Prompt contents
- * @param {string} [options.systemInstruction] Optional system guidelines for the prompt
- * @returns {AsyncGenerator<any>} Streaming response iterator
  */
 export async function generateStream({ contents, systemInstruction }) {
   const ai = getAiClient();
@@ -100,3 +96,62 @@ Answer their questions concisely, using markdown when helpful. Reference details
   }
 }
 
+/**
+ * Handles POST /api/ai/extract-outline
+ * Accepts page text samples from the client and asks Gemini to identify chapter/section structure.
+ * Body: { bookTitle: string, pageSamples: [{ pageNum: number, text: string }] }
+ * Returns: { outline: [{ title: string, pageNum: number }] }
+ */
+export async function handleExtractOutlineRoute(req, res) {
+  const body = await readJsonBody(req);
+  const { bookTitle, pageSamples } = body || {};
+
+  if (!pageSamples || !Array.isArray(pageSamples) || pageSamples.length === 0) {
+    return res.status(400).json({ error: "pageSamples array is required" });
+  }
+
+  const samplesText = pageSamples
+    .map((s) => `--- Page ${s.pageNum} ---\n${(s.text || "").slice(0, 600)}`)
+    .join("\n\n");
+
+  const prompt = `You are analyzing a book called "${bookTitle || "Unknown"}". Below are text samples from various pages.
+Identify the main chapters and sections. For each chapter or major section, provide:
+- The title (exactly as written in the book, or a clean version)
+- The page number where it starts
+
+Return ONLY valid JSON in this format, with no extra text:
+[
+  { "title": "Chapter 1: Introduction", "pageNum": 1 },
+  { "title": "Chapter 2: The Journey", "pageNum": 15 }
+]
+
+Text samples:
+${samplesText}`;
+
+  try {
+    const ai = getAiClient();
+    const response = await ai.models.generateContent({
+      model: "gemini-2.5-flash",
+      contents: [{ role: "user", parts: [{ text: prompt }] }],
+      config: { thinkingConfig: { thinkingBudget: 0 } },
+    });
+
+    const raw = response.text || "";
+    // Extract JSON array from the response (strip markdown fences if any)
+    const jsonMatch = raw.match(/\[\s*\{[\s\S]*\}\s*\]/);
+    if (!jsonMatch) {
+      return res.status(200).json({ outline: [] });
+    }
+
+    let outline = JSON.parse(jsonMatch[0]);
+    // Validate and clean
+    outline = outline
+      .filter((item) => item.title && typeof item.pageNum === "number" && item.pageNum >= 1)
+      .sort((a, b) => a.pageNum - b.pageNum);
+
+    return res.status(200).json({ outline });
+  } catch (err) {
+    console.error("AI outline extraction error:", err);
+    return res.status(200).json({ outline: [] });
+  }
+}

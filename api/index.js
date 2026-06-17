@@ -3,7 +3,9 @@ import {
   createBook,
   deleteBook,
   getBook,
+  getBookOutline,
   listBooks,
+  setBookOutline,
   updateBook,
 } from "./lib/books.js";
 import { readJsonBody } from "./lib/body.js";
@@ -11,7 +13,10 @@ import { parseCloudinaryKey } from "./lib/cloudinary.js";
 import { uploadAsset } from "./lib/multipart.js";
 import { healthCheck } from "./lib/health.js";
 import { checkRateLimit } from "./lib/rate-limit.js";
-import { handleChatRoute } from "./lib/ai.js";
+import {
+  handleChatRoute,
+  handleExtractOutlineRoute,
+} from "./lib/ai.js";
 
 function parsePositiveInt(value, fallback) {
   const num = Number.parseInt(value ?? "", 10);
@@ -92,6 +97,31 @@ export default async function handler(req, res) {
     if (method === "POST" && parts[0] === "api" && parts[1] === "ai" && parts[2] === "chat" && parts.length === 3) {
       if (applyRateLimit(req, res, "ai-chat")) return;
       return await handleChatRoute(req, res);
+    }
+
+    // POST /api/ai/extract-outline — AI-powered chapter detection
+    if (method === "POST" && parts[0] === "api" && parts[1] === "ai" && parts[2] === "extract-outline" && parts.length === 3) {
+      if (applyRateLimit(req, res, "ai-chat")) return;
+      return await handleExtractOutlineRoute(req, res);
+    }
+
+    // GET book outline (cached chapters) - public, no auth needed
+    if (method === "GET" && parts[0] === "api" && parts[1] === "books" && parts.length === 4 && parts[3] === "outline") {
+      const outline = await getBookOutline(parts[2]);
+      return res.status(200).json({ outline });
+    }
+
+    // PATCH book outline (save cached chapters) - no admin auth required (client-generated data)
+    if (method === "PATCH" && parts[0] === "api" && parts[1] === "books" && parts.length === 4 && parts[3] === "outline") {
+      const body = await readJsonBody(req);
+      const { outline } = body || {};
+      if (!outline || !Array.isArray(outline)) {
+        return res.status(400).json({ error: "outline must be an array" });
+      }
+      const book = await getBook(parts[2]);
+      if (!book) return res.status(404).json({ error: "Book not found" });
+      await setBookOutline(parts[2], outline);
+      return res.status(200).json({ ok: true });
     }
 
     const needsAuth = method === "POST" || method === "PATCH" || method === "DELETE";
