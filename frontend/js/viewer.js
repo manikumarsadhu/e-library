@@ -105,7 +105,13 @@ function updateFullscreenIcon(isFullscreen) {
 
 // Fullscreen escape listener
 document.addEventListener("fullscreenchange", () => {
-  updateFullscreenIcon(!!document.fullscreenElement);
+  const isFullscreen = !!document.fullscreenElement;
+  updateFullscreenIcon(isFullscreen);
+  if (isFullscreen) {
+    document.body.classList.add("fullscreen-mode");
+  } else {
+    document.body.classList.remove("fullscreen-mode");
+  }
 });
 
 const pageObserver = new IntersectionObserver((entries) => {
@@ -460,6 +466,48 @@ const sidebarBackdrop = document.getElementById("sidebar-backdrop");
 const MOBILE_SIDEBAR_MAX = 576;
 const isMobileSidebar = () => window.matchMedia(`(max-width: ${MOBILE_SIDEBAR_MAX}px)`).matches;
 let mobileSheetHeightVh = 60;
+
+// Sidebar width customization & splitter resizing
+const sidebarResizer = document.getElementById("sidebar-resizer");
+const SAVED_SIDEBAR_WIDTH_KEY = "elibrary_sidebar_width";
+const savedSidebarWidth = localStorage.getItem(SAVED_SIDEBAR_WIDTH_KEY);
+if (savedSidebarWidth && aiSidebar) {
+  document.documentElement.style.setProperty("--sidebar-width", savedSidebarWidth);
+}
+
+if (sidebarResizer && aiSidebar) {
+  sidebarResizer.addEventListener("mousedown", (e) => {
+    e.preventDefault();
+    aiSidebar.classList.add("resizing");
+    sidebarResizer.classList.add("active");
+
+    const startX = e.clientX;
+    const startWidth = parseInt(window.getComputedStyle(aiSidebar).width, 10);
+
+    const onMouseMove = (moveEvent) => {
+      const deltaX = startX - moveEvent.clientX;
+      const newWidth = Math.min(Math.max(startWidth + deltaX, 280), window.innerWidth * 0.8);
+      document.documentElement.style.setProperty("--sidebar-width", `${newWidth}px`);
+    };
+
+    const onMouseUp = () => {
+      aiSidebar.classList.remove("resizing");
+      sidebarResizer.classList.remove("active");
+
+      const finalWidth = window.getComputedStyle(aiSidebar).width;
+      localStorage.setItem(SAVED_SIDEBAR_WIDTH_KEY, finalWidth);
+
+      window.removeEventListener("mousemove", onMouseMove);
+      window.removeEventListener("mouseup", onMouseUp);
+
+      // Trigger a window resize event to redraw/refit viewer content nicely
+      window.dispatchEvent(new Event("resize"));
+    };
+
+    window.addEventListener("mousemove", onMouseMove);
+    window.addEventListener("mouseup", onMouseUp);
+  });
+}
 
 function setSidebarOpen(open) {
   if (!aiSidebar) return;
