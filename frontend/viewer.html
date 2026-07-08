@@ -18,6 +18,7 @@
       --text-muted: #94a3b8;
       --primary-color: #3b82f6;
       --primary-hover: #2563eb;
+      --sidebar-width: 360px;
     }
 
     body {
@@ -706,22 +707,44 @@
     }
 
     #ai-sidebar {
-      width: 360px;
+      width: var(--sidebar-width);
       background-color: var(--surface-color);
       border-left: 1px solid var(--border-color);
       display: flex;
       flex-direction: column;
+      position: relative;
       transition: transform 0.3s ease, margin-right 0.3s ease, width 0.3s ease;
       z-index: 50;
       box-shadow: -4px 0 15px -3px rgba(0, 0, 0, 0.3);
     }
 
     #ai-sidebar.collapsed {
-      margin-right: -360px;
-      transform: translateX(360px);
+      margin-right: calc(-1 * var(--sidebar-width));
+      transform: translateX(var(--sidebar-width));
       pointer-events: none;
       width: 0;
       border-left: none;
+    }
+
+    #ai-sidebar.resizing {
+      transition: none !important;
+    }
+
+    .sidebar-resizer {
+      position: absolute;
+      left: -3px;
+      top: 0;
+      bottom: 0;
+      width: 6px;
+      cursor: col-resize;
+      z-index: 100;
+      background: transparent;
+      transition: background-color 0.15s ease;
+    }
+
+    .sidebar-resizer:hover,
+    .sidebar-resizer.active {
+      background-color: var(--primary-color);
     }
 
     .sidebar-header {
@@ -921,6 +944,10 @@
         transform: translateX(320px);
         width: 0;
       }
+
+      .sidebar-resizer {
+        display: none !important;
+      }
     }
 
     @media (max-width: 576px) {
@@ -949,6 +976,33 @@
         height: 0;
         width: 100%;
       }
+    }
+
+    /* Fullscreen Mode overrides */
+    body.fullscreen-mode header {
+      position: fixed;
+      top: 1rem;
+      right: 1rem;
+      background: transparent !important;
+      border: none !important;
+      box-shadow: none !important;
+      padding: 0 !important;
+      z-index: 1000;
+    }
+    body.fullscreen-mode header .doc-info {
+      display: none !important;
+    }
+    body.fullscreen-mode header .controls > *:not(#fullscreen-toggle) {
+      display: none !important;
+    }
+    body.fullscreen-mode #ai-sidebar {
+      display: none !important;
+    }
+    body.fullscreen-mode #sidebar-backdrop {
+      display: none !important;
+    }
+    body.fullscreen-mode #viewer-container {
+      padding-top: 1rem !important;
     }
   </style>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js"
@@ -1061,6 +1115,7 @@
 
     <!-- AI Sidebar -->
     <div id="ai-sidebar" class="collapsed">
+      <div id="sidebar-resizer" class="sidebar-resizer"></div>
       <div class="drag-handle"></div>
       <div class="sidebar-tabs">
         <button id="tab-chapters" class="sidebar-tab-btn active" title="Chapters">📖 <span class="tab-text">Chapters</span></button>
