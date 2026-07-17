@@ -4,7 +4,7 @@ import { getDb, getRows } from "./db.js";
 import { escapeLike } from "./search.js";
 
 const BOOK_COLUMNS =
-  "id, title, author, year, cover_key, file_key, outline, created_at, updated_at";
+  "id, title, author, year, cover_key, file_key, outline, category_id, created_at, updated_at";
 
 export function rowToBook(row) {
   return {
@@ -15,6 +15,7 @@ export function rowToBook(row) {
     cover_key: row.cover_key,
     file_key: row.file_key,
     outline: row.outline ?? null,
+    category_id: row.category_id ?? null,
     created_at: row.created_at,
     updated_at: row.updated_at,
   };
@@ -24,49 +25,41 @@ export function computePageOffset(page, limit) {
   return (page - 1) * limit;
 }
 
-export async function listBooks({ query, page, limit }) {
+export async function listBooks({ query, page, limit, category_id }) {
   const db = getDb();
   const q = (query || "").trim();
   const offset = computePageOffset(page, limit);
 
+  const whereClauses = [];
+  const params = [];
+
   if (q) {
     const pattern = `%${escapeLike(q)}%`;
-    const countResult = await db.execute(
-      `SELECT COUNT(*) AS total FROM books
-       WHERE LOWER(title) LIKE LOWER(?)
-          OR LOWER(author) LIKE LOWER(?)
-          OR CAST(year AS CHAR) LIKE ?`,
-      [pattern, pattern, pattern]
+    whereClauses.push(
+      `(LOWER(title) LIKE LOWER(?) OR LOWER(author) LIKE LOWER(?) OR CAST(year AS CHAR) LIKE ?)`
     );
-    const total = Number(getRows(countResult)[0]?.total || 0);
-    const listResult = await db.execute(
-      `SELECT ${BOOK_COLUMNS} FROM books
-       WHERE LOWER(title) LIKE LOWER(?)
-          OR LOWER(author) LIKE LOWER(?)
-          OR CAST(year AS CHAR) LIKE ?
-       ORDER BY title ASC
-       LIMIT ? OFFSET ?`,
-      [pattern, pattern, pattern, limit, offset]
-    );
-    const books = getRows(listResult).map(rowToBook);
-    return {
-      books,
-      total,
-      page,
-      limit,
-      pages: Math.max(1, Math.ceil(total / limit)),
-    };
+    params.push(pattern, pattern, pattern);
   }
 
-  const countResult = await db.execute(`SELECT COUNT(*) AS total FROM books`);
+  if (category_id) {
+    whereClauses.push(`category_id = ?`);
+    params.push(category_id);
+  }
+
+  const whereSql = whereClauses.length > 0 ? `WHERE ${whereClauses.join(" AND ")}` : "";
+
+  const countResult = await db.execute(
+    `SELECT COUNT(*) AS total FROM books ${whereSql}`,
+    params
+  );
   const total = Number(getRows(countResult)[0]?.total || 0);
+
   const listResult = await db.execute(
-    `SELECT ${BOOK_COLUMNS} FROM books
-     ORDER BY title ASC
-     LIMIT ? OFFSET ?`,
-    [limit, offset]
+    `SELECT ${BOOK_COLUMNS} FROM books ${whereSql} ORDER BY title ASC LIMIT ? OFFSET ?`,
+    [...params, limit, offset]
   );
   const books = getRows(listResult).map(rowToBook);
+
   return {
     books,
     total,
@@ -87,7 +80,7 @@ export async function getBook(id) {
 }
 
 export async function createBook(body) {
-  const { title, author, year } = body || {};
+  const { title, author, year, category_id } = body || {};
   if (typeof title !== "string" || typeof author !== "string") {
     throw new Error("title and author are required");
   }
@@ -107,11 +100,17 @@ export async function createBook(body) {
     }
     validYear = numYear;
   }
+
+  let validCategoryId = null;
+  if (typeof category_id === "string" && category_id.trim()) {
+    validCategoryId = category_id.trim();
+  }
+
   const id = crypto.randomUUID();
   const db = getDb();
   await db.execute(
-    `INSERT INTO books (id, title, author, year) VALUES (?, ?, ?, ?)`,
-    [id, trimmedTitle, trimmedAuthor, validYear]
+    `INSERT INTO books (id, title, author, year, category_id) VALUES (?, ?, ?, ?, ?)`,
+    [id, trimmedTitle, trimmedAuthor, validYear, validCategoryId]
   );
   return getBook(id);
 }
@@ -123,6 +122,7 @@ export async function updateBook(id, body) {
   let title = existing.title;
   let author = existing.author;
   let year = existing.year;
+  let category_id = existing.category_id;
 
   if (body.title !== undefined) {
     if (typeof body.title !== "string" || !body.title.trim()) {
@@ -156,10 +156,18 @@ export async function updateBook(id, body) {
     }
   }
 
+  if (body.category_id !== undefined) {
+    if (typeof body.category_id === "string" && body.category_id.trim()) {
+      category_id = body.category_id.trim();
+    } else {
+      category_id = null;
+    }
+  }
+
   const db = getDb();
   await db.execute(
-    `UPDATE books SET title = ?, author = ?, year = ? WHERE id = ?`,
-    [title, author, year, id]
+    `UPDATE books SET title = ?, author = ?, year = ?, category_id = ? WHERE id = ?`,
+    [title, author, year, category_id, id]
   );
   return getBook(id);
 }

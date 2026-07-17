@@ -27,6 +27,12 @@
             autocomplete="off"
           />
         </div>
+        <div class="filter-wrap">
+          <label for="filter-category" class="visually-hidden">Filter by Category</label>
+          <select id="filter-category" class="filter-category">
+            <option value="">All</option>
+          </select>
+        </div>
         <div class="admin-wrap">
           <label for="api-key" class="admin-label">Admin API key</label>
           <input
@@ -37,6 +43,7 @@
             aria-describedby="api-key-error"
           />
           <p id="api-key-error" class="input-error" role="alert" aria-live="polite"></p>
+          <button id="manage-categories-btn" class="btn btn-secondary admin-only-btn" type="button" style="display: none; margin-top: 0.5rem; width: 100%;">Manage Categories</button>
         </div>
       </section>
 
@@ -61,6 +68,12 @@
               max="2100"
               placeholder="e.g. 2020"
             />
+          </div>
+          <div class="form-row">
+            <label for="category">Category</label>
+            <select id="category" name="category_id">
+              <option value="">None</option>
+            </select>
           </div>
           <div class="form-row">
             <label for="cover">Cover image (optional)</label>
@@ -97,7 +110,7 @@
           <p id="book-count" class="book-count" aria-live="polite"></p>
         </div>
         <p id="status-message" class="status-message" role="status" aria-live="polite"></p>
-        <button id="retry-load" class="btn btn-secondary retry-btn" type="button" hidden>Retry</button>
+        <button id="retry-load" class="btn btn-secondary retry-btn" type="button" hidden>Refresh</button>
         <div id="book-list" class="book-list" role="list"></div>
         <div id="pager" class="pager" aria-label="Pagination">
           <button id="prev-page" class="btn btn-secondary" type="button">Previous</button>
@@ -131,6 +144,12 @@
           />
         </div>
         <div class="form-row">
+          <label for="edit-category">Category</label>
+          <select id="edit-category" name="category_id">
+            <option value="">None</option>
+          </select>
+        </div>
+        <div class="form-row">
           <label for="edit-cover">Replace cover image (optional)</label>
           <input
             type="file"
@@ -157,6 +176,30 @@
           <button type="button" id="edit-cancel" class="btn btn-secondary">Cancel</button>
         </div>
       </form>
+    </dialog>
+
+    <dialog id="category-modal" class="category-modal" aria-labelledby="category-heading-modal">
+      <div class="category-modal-content">
+        <h2 id="category-heading-modal">Manage Categories</h2>
+        
+        <div class="category-list-wrap">
+          <ul id="category-modal-list" class="category-modal-list">
+            <!-- Dynamically populated categories with edit/delete actions -->
+          </ul>
+        </div>
+        
+        <form id="category-add-form" class="category-add-form">
+          <h3>Add New Category</h3>
+          <div class="form-row inline-row">
+            <input type="text" id="new-category-name" placeholder="Category name (e.g. Lessons)" required maxlength="100" autocomplete="off" />
+            <button type="submit" class="btn btn-primary">Add</button>
+          </div>
+        </form>
+
+        <div class="form-actions" style="margin-top: 1.5rem;">
+          <button type="button" id="category-close-btn" class="btn btn-secondary" style="width: 100%;">Close</button>
+        </div>
+      </div>
     </dialog>
 
     <footer class="site-footer">

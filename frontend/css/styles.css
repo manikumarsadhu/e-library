@@ -520,4 +520,157 @@ body.is-admin button[data-action="edit"] {
   }
 }
 
+/* Category Feature Styles */
+.add-form select,
+.edit-form select {
+  width: 100%;
+  padding: 0.625rem 0.75rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  font: inherit;
+  background: var(--color-surface);
+  cursor: pointer;
+}
+
+.add-form select:focus,
+.edit-form select:focus {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 1px;
+}
+
+/* Category Filter Dropdown */
+.filter-wrap {
+  flex: 1 1 180px;
+}
+
+#filter-category {
+  width: 100%;
+  padding: 0.625rem 0.75rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  font: inherit;
+  background: var(--color-surface);
+  cursor: pointer;
+}
+
+#filter-category:focus {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 1px;
+}
+
+/* Category Badge on Cards */
+.book-category-badge {
+  display: inline-block;
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 0.2rem 0.6rem;
+  border-radius: 4px;
+  margin-top: 0.5rem;
+  background: hsla(220, 85%, 90%, 0.4);
+  color: var(--color-primary);
+  border: 1px solid rgba(37, 99, 235, 0.2);
+}
+
+/* Category Management Modal */
+.category-modal {
+  border: none;
+  border-radius: var(--radius);
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.15), 0 10px 10px -5px rgba(0, 0, 0, 0.1);
+  padding: 1.5rem;
+  max-width: 450px;
+  width: 90%;
+  background: var(--color-surface);
+}
+
+.category-modal::backdrop {
+  background: rgba(15, 23, 42, 0.4);
+  backdrop-filter: blur(4px);
+}
+
+.category-modal-content h2 {
+  margin: 0 0 1.25rem;
+  font-size: 1.25rem;
+  color: var(--color-text);
+  border-bottom: 2px solid var(--color-border);
+  padding-bottom: 0.5rem;
+}
+
+.category-list-wrap {
+  max-height: 220px;
+  overflow-y: auto;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  margin-bottom: 1.5rem;
+  background: var(--color-bg);
+}
+
+.category-modal-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.category-modal-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.625rem 0.75rem;
+  border-bottom: 1px solid var(--color-border);
+  gap: 0.5rem;
+}
+
+.category-modal-list li:last-child {
+  border-bottom: none;
+}
+
+.category-name-span {
+  font-weight: 500;
+  font-size: 0.9375rem;
+  color: var(--color-text);
+  flex-grow: 1;
+}
+
+.category-edit-input {
+  flex-grow: 1;
+  padding: 0.35rem 0.5rem;
+  border: 1px solid var(--color-primary);
+  border-radius: 6px;
+  font: inherit;
+  font-size: 0.9375rem;
+}
+
+.category-item-actions {
+  display: flex;
+  gap: 0.25rem;
+}
+
+.category-item-actions .btn {
+  padding: 0.3rem 0.6rem;
+  min-height: auto;
+  font-size: 0.75rem;
+  border-radius: 6px;
+}
+
+.category-add-form h3 {
+  margin: 0 0 0.75rem;
+  font-size: 1rem;
+  color: var(--color-text);
+}
+
+.inline-row {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.inline-row input {
+  flex-grow: 1;
+}
+
+body.is-admin .admin-only-btn {
+  display: block !important;
+}
+
+
 
