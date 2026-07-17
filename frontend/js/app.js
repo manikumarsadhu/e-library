@@ -9,6 +9,10 @@ import {
   getApiKey,
   setApiKey,
   validateApiKey,
+  fetchCategories,
+  createCategory,
+  updateCategory,
+  deleteCategory,
 } from "./api.js";
 
 const bookList = document.getElementById("book-list");
@@ -34,10 +38,22 @@ const editYearInput = document.getElementById("edit-year");
 const editCoverInput = document.getElementById("edit-cover");
 const editPdfInput = document.getElementById("edit-pdf");
 
+// Category UI Elements
+const filterCategorySelect = document.getElementById("filter-category");
+const categorySelect = document.getElementById("category");
+const editCategorySelect = document.getElementById("edit-category");
+const categoryModal = document.getElementById("category-modal");
+const manageCategoriesBtn = document.getElementById("manage-categories-btn");
+const categoryModalList = document.getElementById("category-modal-list");
+const categoryAddForm = document.getElementById("category-add-form");
+const categoryCloseBtn = document.getElementById("category-close-btn");
+
 let allBooks = [];
+let allCategories = [];
+let currentCategoryFilter = sessionStorage.getItem("elibrary_category_filter") || "";
 let searchDebounce = null;
-let currentPage = 1;
-const pageSize = 20;
+let currentPage = parseInt(sessionStorage.getItem("elibrary_current_page") || "1", 10);
+const pageSize = 6;
 let totalPages = 1;
 let lastFocusEl = null;
 const supportsDialog = typeof editModal.showModal === "function";
@@ -108,6 +124,14 @@ function renderBookCard(book) {
     createEl("p", "book-meta", `${book.author}${book.year ? ` · ${book.year}` : ""}`)
   );
 
+  if (book.category_id) {
+    const cat = allCategories.find((c) => c.id === book.category_id);
+    if (cat) {
+      const badge = createEl("span", "book-category-badge", cat.name);
+      body.appendChild(badge);
+    }
+  }
+
   const actions = createEl("div", "book-actions");
 
   if (book.file_key) {
@@ -157,6 +181,139 @@ function getCurrentBook(id) {
   return allBooks.find((b) => b.id === id);
 }
 
+async function loadCategories() {
+  try {
+    allCategories = await fetchCategories();
+    populateCategoryFiltersDropdown();
+    populateCategoryDropdowns();
+    renderCategoryModalList();
+  } catch (err) {
+    console.error("Failed to load categories:", err);
+  }
+}
+
+function populateCategoryFiltersDropdown() {
+  if (!filterCategorySelect) return;
+  
+  // Clear and add "All" option
+  filterCategorySelect.replaceChildren(createEl("option", "", "All"));
+  filterCategorySelect.options[0].value = "";
+
+  allCategories.forEach((cat) => {
+    const opt = createEl("option", "", cat.name);
+    opt.value = cat.id;
+    filterCategorySelect.appendChild(opt);
+  });
+
+  // Restore active filter selection
+  filterCategorySelect.value = currentCategoryFilter || "";
+}
+
+function populateCategoryDropdowns() {
+  if (!categorySelect || !editCategorySelect) return;
+  
+  // Clear other than first "None" option
+  categorySelect.replaceChildren(createEl("option", "", "None"));
+  categorySelect.options[0].value = "";
+  
+  editCategorySelect.replaceChildren(createEl("option", "", "None"));
+  editCategorySelect.options[0].value = "";
+
+  allCategories.forEach((cat) => {
+    const optAdd = createEl("option", "", cat.name);
+    optAdd.value = cat.id;
+    categorySelect.appendChild(optAdd);
+
+    const optEdit = createEl("option", "", cat.name);
+    optEdit.value = cat.id;
+    editCategorySelect.appendChild(optEdit);
+  });
+}
+
+function renderCategoryModalList() {
+  if (!categoryModalList) return;
+  categoryModalList.replaceChildren();
+  if (allCategories.length === 0) {
+    categoryModalList.appendChild(createEl("li", "", "No categories created yet."));
+    return;
+  }
+
+  allCategories.forEach((cat) => {
+    const li = createEl("li");
+    li.dataset.categoryId = cat.id;
+
+    const nameSpan = createEl("span", "category-name-span", cat.name);
+    li.appendChild(nameSpan);
+
+    const actions = createEl("div", "category-item-actions");
+
+    const editBtn = createEl("button", "btn btn-secondary", "Edit");
+    editBtn.type = "button";
+    editBtn.addEventListener("click", () => {
+      enterCategoryEditState(li, cat);
+    });
+
+    const deleteBtn = createEl("button", "btn btn-danger", "Delete");
+    deleteBtn.type = "button";
+    deleteBtn.addEventListener("click", async () => {
+      if (!confirm(`Delete category "${cat.name}"? Books in this category will not be deleted, but will have no category.`)) return;
+      try {
+        await deleteCategory(cat.id);
+        if (currentCategoryFilter === cat.id) {
+          currentCategoryFilter = "";
+          currentPage = 1;
+        }
+        await loadCategories();
+        await loadBooks();
+      } catch (err) {
+        alert(err.message || "Failed to delete category");
+      }
+    });
+
+    actions.appendChild(editBtn);
+    actions.appendChild(deleteBtn);
+    li.appendChild(actions);
+    categoryModalList.appendChild(li);
+  });
+}
+
+function enterCategoryEditState(li, cat) {
+  li.replaceChildren();
+
+  const input = createEl("input", "category-edit-input");
+  input.type = "text";
+  input.value = cat.name;
+  input.maxLength = 100;
+  li.appendChild(input);
+
+  const actions = createEl("div", "category-item-actions");
+
+  const saveBtn = createEl("button", "btn btn-primary", "Save");
+  saveBtn.type = "button";
+  saveBtn.addEventListener("click", async () => {
+    const newName = input.value.trim();
+    if (!newName) return;
+    try {
+      await updateCategory(cat.id, { name: newName });
+      await loadCategories();
+      await loadBooks();
+    } catch (err) {
+      alert(err.message || "Failed to save category");
+    }
+  });
+
+  const cancelBtn = createEl("button", "btn btn-secondary", "Cancel");
+  cancelBtn.type = "button";
+  cancelBtn.addEventListener("click", () => {
+    renderCategoryModalList();
+  });
+
+  actions.appendChild(saveBtn);
+  actions.appendChild(cancelBtn);
+  li.appendChild(actions);
+  input.focus();
+}
+
 function openEditModal(book) {
   if (!book) return;
   lastFocusEl = document.activeElement;
@@ -164,6 +321,7 @@ function openEditModal(book) {
   editTitleInput.value = book.title || "";
   editAuthorInput.value = book.author || "";
   editYearInput.value = book.year || "";
+  editCategorySelect.value = book.category_id || "";
   editCoverInput.value = "";
   editPdfInput.value = "";
   document.body.classList.add("modal-open");
@@ -193,7 +351,11 @@ async function loadBooks() {
   setStatus("Loading…");
   try {
     const query = searchInput.value;
-    const response = await fetchBooks(query, currentPage, pageSize);
+    sessionStorage.setItem("elibrary_search_query", query);
+    sessionStorage.setItem("elibrary_current_page", String(currentPage));
+    sessionStorage.setItem("elibrary_category_filter", currentCategoryFilter);
+
+    const response = await fetchBooks(query, currentPage, pageSize, currentCategoryFilter);
     if (currentPage > response.pages) {
       currentPage = response.pages;
       return loadBooks();
@@ -223,7 +385,7 @@ bookList.addEventListener("click", async (e) => {
     const book = allBooks.find((b) => b.id === id);
     if (book && book.file_key) {
       const viewerUrl = `viewer.html?file=${encodeURIComponent(fileUrl(book.file_key))}&title=${encodeURIComponent(book.title)}&id=${encodeURIComponent(id)}`;
-      window.open(viewerUrl, "_blank");
+      window.location.href = viewerUrl;
     }
     return;
   }
@@ -268,12 +430,13 @@ addForm.addEventListener("submit", async (e) => {
   const author = addForm.author.value.trim();
   const yearVal = addForm.year.value;
   const year = yearVal ? parseInt(yearVal, 10) : null;
+  const category_id = addForm.category_id.value;
   const coverFile = addForm.cover.files[0];
   const pdfFile = addForm.pdf.files[0];
 
   setStatus("Adding book…");
   try {
-    const book = await createBook({ title, author, year });
+    const book = await createBook({ title, author, year, category_id });
     try {
       if (coverFile) await uploadCover(book.id, coverFile);
       if (pdfFile) await uploadFile(book.id, pdfFile);
@@ -326,7 +489,7 @@ apiKeyInput.addEventListener("input", () => {
 });
 
 retryLoadBtn.addEventListener("click", () => {
-  setStatus("Retrying…");
+  setStatus("Refreshing…");
   loadBooks();
 });
 
@@ -351,12 +514,13 @@ editForm.addEventListener("submit", async (e) => {
   const author = editAuthorInput.value.trim();
   const yearVal = editYearInput.value;
   const year = yearVal ? parseInt(yearVal, 10) : null;
+  const category_id = editForm.category_id.value;
   const coverFile = editCoverInput.files[0];
   const pdfFile = editPdfInput.files[0];
 
   setStatus("Saving changes…");
   try {
-    await updateBook(id, { title, author, year });
+    await updateBook(id, { title, author, year, category_id });
     if (coverFile) await uploadCover(id, coverFile);
     if (pdfFile) await uploadFile(id, pdfFile);
     closeEditModal();
@@ -381,8 +545,63 @@ if (!supportsDialog) {
   });
 }
 
+// Category Modal Event Listeners
+if (manageCategoriesBtn) {
+  manageCategoriesBtn.addEventListener("click", () => {
+    if (categoryModal.showModal) {
+      categoryModal.showModal();
+    } else {
+      categoryModal.setAttribute("open", "");
+      categoryModal.classList.add("fallback-open");
+    }
+  });
+}
+
+if (categoryCloseBtn) {
+  categoryCloseBtn.addEventListener("click", () => {
+    if (categoryModal.close) {
+      categoryModal.close();
+    } else {
+      categoryModal.removeAttribute("open");
+      categoryModal.classList.remove("fallback-open");
+    }
+  });
+}
+
+if (categoryAddForm) {
+  categoryAddForm.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const nameInput = document.getElementById("new-category-name");
+    const name = nameInput.value.trim();
+    if (!name) return;
+    try {
+      await createCategory({ name });
+      nameInput.value = "";
+      await loadCategories();
+    } catch (err) {
+      alert(err.message || "Failed to create category");
+    }
+  });
+}
+
+if (filterCategorySelect) {
+  filterCategorySelect.addEventListener("change", () => {
+    currentCategoryFilter = filterCategorySelect.value;
+    currentPage = 1;
+    loadBooks();
+  });
+}
+
 apiKeyInput.value = getApiKey();
 updateAdminUI();
 footerYear.textContent = new Date().getFullYear();
 
-loadBooks();
+const savedQuery = sessionStorage.getItem("elibrary_search_query");
+if (savedQuery !== null) {
+  searchInput.value = savedQuery;
+}
+
+// Load categories first, then load books to ensure category names are populated
+loadCategories().then(() => {
+  loadBooks();
+});

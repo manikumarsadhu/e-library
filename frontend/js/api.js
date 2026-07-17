@@ -61,11 +61,12 @@ export async function validateApiKey(key) {
   }
 }
 
-export async function fetchBooks(query = "", page = 1, limit = 20) {
+export async function fetchBooks(query = "", page = 1, limit = 20, category_id = "") {
   const url = new URL(`${API_BASE_URL}/api/books`);
   if (query.trim()) url.searchParams.set("q", query.trim());
   url.searchParams.set("page", String(page));
   url.searchParams.set("limit", String(limit));
+  if (category_id) url.searchParams.set("category_id", category_id);
   const res = await fetch(url.toString(), { headers: headers() });
   const data = await parseResponse(res);
   return {
@@ -128,4 +129,38 @@ export async function uploadFile(bookId, file) {
   });
   const data = await parseResponse(res);
   return data.book;
+}
+
+export async function fetchCategories() {
+  const res = await fetch(`${API_BASE_URL}/api/categories`, { headers: headers() });
+  const data = await parseResponse(res);
+  return data.categories || [];
+}
+
+export async function createCategory(payload) {
+  const res = await fetch(`${API_BASE_URL}/api/categories`, {
+    method: "POST",
+    headers: { ...headers(true), "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  const data = await parseResponse(res);
+  return data.category;
+}
+
+export async function updateCategory(id, payload) {
+  const res = await fetch(`${API_BASE_URL}/api/categories/${id}`, {
+    method: "PATCH",
+    headers: { ...headers(true), "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  const data = await parseResponse(res);
+  return data.category;
+}
+
+export async function deleteCategory(id) {
+  const res = await fetch(`${API_BASE_URL}/api/categories/${id}`, {
+    method: "DELETE",
+    headers: headers(true),
+  });
+  return parseResponse(res);
 }

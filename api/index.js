@@ -17,6 +17,12 @@ import {
   handleChatRoute,
   handleExtractOutlineRoute,
 } from "./lib/ai.js";
+import {
+  createCategory,
+  deleteCategory,
+  listCategories,
+  updateCategory,
+} from "./lib/categories.js";
 
 function parsePositiveInt(value, fallback) {
   const num = Number.parseInt(value ?? "", 10);
@@ -66,7 +72,8 @@ export default async function handler(req, res) {
       const q = parsedUrl.searchParams.get("q") || "";
       const page = parsePositiveInt(parsedUrl.searchParams.get("page"), 1);
       const limit = Math.min(parsePositiveInt(parsedUrl.searchParams.get("limit"), 20), 100);
-      const result = await listBooks({ query: q, page, limit });
+      const category_id = parsedUrl.searchParams.get("category_id") || "";
+      const result = await listBooks({ query: q, page, limit, category_id });
       return res.status(200).json(result);
     }
 
@@ -121,13 +128,36 @@ export default async function handler(req, res) {
       const book = await getBook(parts[2]);
       if (!book) return res.status(404).json({ error: "Book not found" });
       await setBookOutline(parts[2], outline);
-      return res.status(200).json({ ok: true });
+    }
+
+    if (method === "GET" && parts[0] === "api" && parts[1] === "categories" && parts.length === 2) {
+      const categories = await listCategories();
+      return res.status(200).json({ categories });
     }
 
     const needsAuth = method === "POST" || method === "PATCH" || method === "DELETE";
 
     if (needsAuth && !requireAuth(req)) {
       return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    if (method === "POST" && parts[0] === "api" && parts[1] === "categories" && parts.length === 2) {
+      const body = await readJsonBody(req);
+      const category = await createCategory(body);
+      return res.status(201).json({ category });
+    }
+
+    if (method === "PATCH" && parts[0] === "api" && parts[1] === "categories" && parts.length === 3) {
+      const body = await readJsonBody(req);
+      const category = await updateCategory(parts[2], body);
+      if (!category) return res.status(404).json({ error: "Category not found" });
+      return res.status(200).json({ category });
+    }
+
+    if (method === "DELETE" && parts[0] === "api" && parts[1] === "categories" && parts.length === 3) {
+      const deleted = await deleteCategory(parts[2]);
+      if (!deleted) return res.status(404).json({ error: "Category not found" });
+      return res.status(200).json({ ok: true });
     }
 
     if (method === "POST" && parts[0] === "api" && parts[1] === "books" && parts.length === 2) {
