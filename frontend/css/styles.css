@@ -672,5 +672,50 @@ body.is-admin .admin-only-btn {
   display: block !important;
 }
 
+/* Shimmer Skeleton Loading */
+.skeleton-card {
+  background: var(--color-surface);
+  border-radius: var(--radius);
+  padding: 1rem;
+  border: 1px solid var(--color-border);
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  min-height: 320px;
+}
+
+.skeleton-box {
+  background: linear-gradient(90deg, #e2e8f0 25%, #f1f5f9 50%, #e2e8f0 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+  border-radius: 6px;
+}
+
+.skeleton-cover {
+  width: 100%;
+  height: 180px;
+}
+
+.skeleton-title {
+  height: 18px;
+  width: 75%;
+}
+
+.skeleton-subtitle {
+  height: 14px;
+  width: 45%;
+}
+
+.skeleton-button {
+  height: 36px;
+  width: 100%;
+  margin-top: auto;
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
 
 
