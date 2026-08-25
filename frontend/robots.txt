@@ -1,0 +1,5 @@
+User-agent: *
+Allow: /
+Disallow: /api/
+
+Sitemap: https://e-library-beta-ruby.vercel.app/sitemap.xml
