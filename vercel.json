@@ -37,6 +37,10 @@
       "destination": "/api/index.js"
     },
     {
+      "source": "/google773b2b0c266e4e2c.html",
+      "destination": "/frontend/google773b2b0c266e4e2c.html"
+    },
+    {
       "source": "/(.*)",
       "destination": "/frontend/$1"
     }
