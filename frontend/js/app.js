@@ -347,8 +347,22 @@ function closeEditModal() {
   }
 }
 
+function renderSkeletonCards(count = 4) {
+  if (!bookList) return;
+  bookList.replaceChildren();
+  for (let i = 0; i < count; i++) {
+    const card = createEl("article", "skeleton-card");
+    card.appendChild(createEl("div", "skeleton-box skeleton-cover"));
+    card.appendChild(createEl("div", "skeleton-box skeleton-title"));
+    card.appendChild(createEl("div", "skeleton-box skeleton-subtitle"));
+    card.appendChild(createEl("div", "skeleton-box skeleton-button"));
+    bookList.appendChild(card);
+  }
+}
+
 async function loadBooks() {
   setStatus("Loading…");
+  renderSkeletonCards(pageSize);
   try {
     const query = searchInput.value;
     sessionStorage.setItem("elibrary_search_query", query);
@@ -592,14 +606,35 @@ if (filterCategorySelect) {
   });
 }
 
-apiKeyInput.value = getApiKey();
+const storedKey = getApiKey();
+apiKeyInput.value = storedKey;
 updateAdminUI();
 footerYear.textContent = new Date().getFullYear();
 
 const savedQuery = sessionStorage.getItem("elibrary_search_query");
 if (savedQuery !== null) {
   searchInput.value = savedQuery;
+} else if (searchInput.value.includes("@")) {
+  // Clear browser-autofilled email from search box
+  searchInput.value = "";
 }
+
+// Clear browser-autofilled passwords if no API key is stored in localStorage
+const clearAutofill = () => {
+  if (!getApiKey()) {
+    apiKeyInput.value = "";
+    apiKeyError.textContent = "";
+    updateAdminUI();
+  }
+  if (!sessionStorage.getItem("elibrary_search_query") && searchInput.value.includes("@")) {
+    searchInput.value = "";
+  }
+};
+
+// Run autofill cleanup on load and after short browser autofill delay
+clearAutofill();
+setTimeout(clearAutofill, 50);
+setTimeout(clearAutofill, 250);
 
 // Load categories first, then load books to ensure category names are populated
 loadCategories().then(() => {

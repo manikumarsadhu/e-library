@@ -68,6 +68,17 @@ export async function uploadAsset(bookId, req, kind) {
 
   if (!fileBuffer) return { error: "file field is required", status: 400 };
 
+  const MAX_COVER_SIZE = 5 * 1024 * 1024; // 5MB
+  const MAX_FILE_SIZE = 25 * 1024 * 1024; // 25MB
+  const maxSize = kind === "cover" ? MAX_COVER_SIZE : MAX_FILE_SIZE;
+
+  if (fileBuffer.length > maxSize) {
+    return {
+      error: `File size exceeds maximum allowed limit of ${maxSize / (1024 * 1024)} MB`,
+      status: 400,
+    };
+  }
+
   const realMimeType = detectRealMimeType(fileBuffer);
   const allowedCovers = ["image/jpeg", "image/png", "image/webp", "image/gif"];
   const allowedFiles = ["application/pdf", ...allowedCovers];
@@ -81,6 +92,31 @@ export async function uploadAsset(bookId, req, kind) {
           : "File must be PDF or an image",
       status: 400,
     };
+  }
+
+  // Security Check: Deep inspection for PDF executable script triggers & polyglot structure
+  if (realMimeType === "application/pdf") {
+    const rawContent = fileBuffer.toString("latin1");
+    const hasHeader = rawContent.includes("%PDF-");
+    const hasTrailer = rawContent.includes("%%EOF");
+    if (!hasHeader || !hasTrailer) {
+      return { error: "Invalid or corrupted PDF structure", status: 400 };
+    }
+
+    const dangerousTriggers = [
+      /\/JS\b/i,
+      /\/JavaScript\b/i,
+      /\/Launch\b/i,
+      /\/EmbeddedFile\b/i,
+    ];
+    for (const trigger of dangerousTriggers) {
+      if (trigger.test(rawContent)) {
+        return {
+          error: "PDF contains unsafe embedded script triggers and was rejected for security.",
+          status: 400,
+        };
+      }
+    }
   }
 
   const options = {

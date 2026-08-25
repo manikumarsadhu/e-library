@@ -8,7 +8,16 @@ const docTitle = urlParams.get("title") || "Document Viewer";
 const bookId = urlParams.get("id") || null;
 
 document.getElementById("doc-title").textContent = docTitle;
-document.title = `${docTitle} - Document Viewer`;
+if (docTitle && docTitle !== "Document Viewer") {
+  document.title = `${docTitle} — Read Online | E-Library AI PDF Reader`;
+  // Update og:title meta dynamically for sharing the direct page link
+  const ogTitleMeta = document.querySelector("meta[property='og:title']");
+  if (ogTitleMeta) ogTitleMeta.setAttribute("content", `${docTitle} — Read Online | E-Library`);
+  const descMeta = document.querySelector("meta[name='description']");
+  if (descMeta) descMeta.setAttribute("content", `Read "${docTitle}" online with AI assistance. Ask questions page by page, navigate chapters, and listen with text-to-speech. Free on E-Library.`);
+} else {
+  document.title = "Document Viewer — E-Library AI PDF Reader";
+}
 
 const container = document.getElementById("viewer-container");
 const loadingEl = document.getElementById("loading");
@@ -66,16 +75,82 @@ document.addEventListener("keydown", (e) => {
   }
 });
 
-// Setup Initial Theme
+// Setup Initial Theme & Font
+const FONT_STORAGE_KEY = "elibrary_viewer_font";
+const fontSelect = document.getElementById("font-select");
+const progressFillEl = document.getElementById("reader-progress-fill");
+const shortcutsBtn = document.getElementById("shortcuts-btn");
+const shortcutsModal = document.getElementById("shortcuts-modal");
+const shortcutsCloseBtn = document.getElementById("shortcuts-close-btn");
+
 const savedTheme = localStorage.getItem(THEME_STORAGE_KEY) || "dark";
-document.body.className = `theme-${savedTheme}`;
-themeSelect.value = savedTheme;
+const savedFont = localStorage.getItem(FONT_STORAGE_KEY) || "sans";
+
+document.body.classList.add(`theme-${savedTheme}`);
+document.body.classList.add(`font-${savedFont}`);
+if (themeSelect) themeSelect.value = savedTheme;
+if (fontSelect) fontSelect.value = savedFont;
 
 // Theme Selector Listener
-themeSelect.addEventListener("change", (e) => {
+themeSelect?.addEventListener("change", (e) => {
   const selectedTheme = e.target.value;
-  document.body.className = `theme-${selectedTheme}`;
+  document.body.className = document.body.className
+    .replace(/\btheme-\S+/g, "")
+    .trim();
+  document.body.classList.add(`theme-${selectedTheme}`);
   localStorage.setItem(THEME_STORAGE_KEY, selectedTheme);
+});
+
+// Font Selector Listener
+fontSelect?.addEventListener("change", (e) => {
+  const selectedFont = e.target.value;
+  document.body.className = document.body.className
+    .replace(/\bfont-\S+/g, "")
+    .trim();
+  document.body.classList.add(`font-${selectedFont}`);
+  localStorage.setItem(FONT_STORAGE_KEY, selectedFont);
+});
+
+function updateProgressBar() {
+  if (!pdfDoc || !pdfDoc.numPages) return;
+  const pct = Math.min(100, Math.max(0, (currentPage / pdfDoc.numPages) * 100));
+  if (progressFillEl) {
+    progressFillEl.style.width = `${pct.toFixed(1)}%`;
+  }
+}
+
+// Shortcuts Modal Handlers
+shortcutsBtn?.addEventListener("click", () => {
+  if (shortcutsModal?.showModal) {
+    shortcutsModal.showModal();
+  }
+});
+
+shortcutsCloseBtn?.addEventListener("click", () => {
+  if (shortcutsModal?.close) {
+    shortcutsModal.close();
+  }
+});
+
+// Keyboard Navigation & Shortcuts
+document.addEventListener("keydown", (e) => {
+  if (["INPUT", "TEXTAREA", "SELECT"].includes(document.activeElement?.tagName)) {
+    return;
+  }
+  if (e.key === "?") {
+    if (shortcutsModal?.showModal) {
+      if (shortcutsModal.open) shortcutsModal.close();
+      else shortcutsModal.showModal();
+    }
+  } else if (e.key === "ArrowLeft") {
+    if (currentPage > 1) scrollToPage(currentPage - 1);
+  } else if (e.key === "ArrowRight") {
+    if (pdfDoc && currentPage < pdfDoc.numPages) scrollToPage(currentPage + 1);
+  } else if (e.key === "b" || e.key === "B") {
+    document.getElementById("bookmark-toggle")?.click();
+  } else if (e.key === "f" || e.key === "F") {
+    fullscreenToggle?.click();
+  }
 });
 
 // Fullscreen Toggle Handler
@@ -134,6 +209,7 @@ const pageObserver = new IntersectionObserver((entries) => {
 function updatePageIndicator() {
   if (pdfDoc) {
     docPagesEl.textContent = `Page: ${currentPage} / ${pdfDoc.numPages}`;
+    updateProgressBar();
   }
 }
 
@@ -231,6 +307,8 @@ async function renderPage(pageNum, pageDiv) {
     
     pageDiv.style.width = `${width}px`;
     pageDiv.style.height = `${height}px`;
+    pageDiv.style.margin = "0 auto";
+    pageDiv.style.alignSelf = "center";
     
     const canvas = document.createElement("canvas");
     const context = canvas.getContext("2d");
@@ -304,6 +382,11 @@ function checkSavedProgress() {
 }
 
 function scrollToPage(pageNum, behavior = "smooth") {
+  if (!pdfDoc || pageNum < 1 || pageNum > pdfDoc.numPages) return;
+  currentPage = pageNum;
+  if (docPagesEl) {
+    docPagesEl.textContent = `Page: ${currentPage} / ${pdfDoc.numPages}`;
+  }
   const targetEl = pageContainers[pageNum - 1];
   if (targetEl) {
     targetEl.scrollIntoView({ behavior, block: "start" });
@@ -1860,4 +1943,38 @@ if (aiSidebar) {
     isDraggingSheet = false;
   }, { passive: true });
 }
+
+// --- Mobile Header Menu Toggle ---
+const mobileMenuToggle = document.getElementById("mobile-menu-toggle");
+const menuIconOpen = document.getElementById("menu-icon-open");
+const menuIconClose = document.getElementById("menu-icon-close");
+const viewerHeader = document.getElementById("viewer-header") || document.querySelector("header");
+
+if (mobileMenuToggle && viewerHeader) {
+  mobileMenuToggle.addEventListener("click", () => {
+    const isOpen = viewerHeader.classList.toggle("menu-open");
+    if (menuIconOpen && menuIconClose) {
+      menuIconOpen.style.display = isOpen ? "none" : "block";
+      menuIconClose.style.display = isOpen ? "block" : "none";
+    }
+  });
+}
+
+// --- Page Navigation Buttons ---
+const prevPageBtn = document.getElementById("prev-page-btn");
+const nextPageBtn = document.getElementById("next-page-btn");
+
+prevPageBtn?.addEventListener("click", () => {
+  if (currentPage > 1) {
+    scrollToPage(currentPage - 1);
+  }
+});
+
+nextPageBtn?.addEventListener("click", () => {
+  if (pdfDoc && currentPage < pdfDoc.numPages) {
+    scrollToPage(currentPage + 1);
+  }
+});
+
+
 

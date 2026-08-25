@@ -3,7 +3,70 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>E-Library</title>
+
+    <!-- Primary SEO -->
+    <title>E-Library — AI-Powered Digital Book Library & PDF Reader</title>
+    <meta name="description" content="Discover, read, and organize your entire book collection with AI. Free online e-library with intelligent PDF reader, AI reading assistant, bookmarks, chapter navigation, and text-to-speech. Read any book anywhere." />
+    <meta name="keywords" content="e-library, AI PDF reader, digital library, online book reader, AI reading assistant, free ebook reader, PDF viewer, chat with book, AI document reader, digital book platform, read books online, smart library, AI powered reading, ebook organizer" />
+    <meta name="author" content="E-Library" />
+    <meta name="robots" content="index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1" />
+    <link rel="canonical" href="https://e-library.app/" />
+
+    <!-- Open Graph (Facebook, LinkedIn, WhatsApp) -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="E-Library" />
+    <meta property="og:title" content="E-Library — AI-Powered Digital Book Library & PDF Reader" />
+    <meta property="og:description" content="Discover, read, and organize your entire book collection with AI. Free online e-library with intelligent PDF reader, AI reading assistant, bookmarks, chapter navigation, and text-to-speech." />
+    <meta property="og:url" content="https://e-library.app/" />
+    <meta property="og:locale" content="en_US" />
+
+    <!-- Twitter / X Card -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="E-Library — AI-Powered Digital Book Library & PDF Reader" />
+    <meta name="twitter:description" content="Read any book online for free. AI assistant answers questions from your books. Bookmarks, chapter navigation, text-to-speech and more." />
+
+    <!-- Structured Data: WebSite + SearchAction (enables Google Sitelinks Search) -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebSite",
+      "name": "E-Library",
+      "url": "https://e-library.app/",
+      "description": "AI-powered digital book library and PDF reader. Read books online, chat with AI about any page, organize your collection.",
+      "potentialAction": {
+        "@type": "SearchAction",
+        "target": "https://e-library.app/?search={search_term_string}",
+        "query-input": "required name=search_term_string"
+      }
+    }
+    </script>
+
+    <!-- Structured Data: SoftwareApplication -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "SoftwareApplication",
+      "name": "E-Library",
+      "applicationCategory": "EducationApplication",
+      "operatingSystem": "Web Browser",
+      "offers": {
+        "@type": "Offer",
+        "price": "0",
+        "priceCurrency": "USD"
+      },
+      "description": "Free AI-powered e-library platform. Read PDFs online, get AI explanations page by page, bookmark chapters, and listen with text-to-speech.",
+      "featureList": [
+        "AI Reading Assistant powered by Google Gemini",
+        "PDF viewer with zoom, text selection, and dark mode",
+        "Chapter navigation and bookmarks",
+        "Text-to-speech with page highlighting",
+        "Search books by title, author, or year",
+        "Offline-ready book organization"
+      ]
+    }
+    </script>
+
+    <!-- Favicon -->
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📖</text></svg>">
     <link rel="stylesheet" href="css/styles.css" />
 
@@ -18,13 +81,19 @@
 
     <main class="container">
       <section class="toolbar" aria-label="Search and admin">
+        <!-- Hidden dummy inputs to catch browser password manager autofill heuristics -->
+        <input type="text" name="prevent_autofill_username" style="display:none" tabindex="-1" autocomplete="off" />
+        <input type="password" name="prevent_autofill_password" style="display:none" tabindex="-1" autocomplete="off" />
+        
         <div class="search-wrap">
           <label for="search" class="visually-hidden">Search books</label>
           <input
             type="search"
             id="search"
+            name="search_query"
             placeholder="Search by title, author, or year…"
             autocomplete="off"
+            aria-autocomplete="none"
           />
         </div>
         <div class="filter-wrap">
@@ -38,8 +107,9 @@
           <input
             type="password"
             id="api-key"
+            name="elibrary_api_key_field"
             placeholder="Required for add, edit, and delete"
-            autocomplete="off"
+            autocomplete="new-password"
             aria-describedby="api-key-error"
           />
           <p id="api-key-error" class="input-error" role="alert" aria-live="polite"></p>
