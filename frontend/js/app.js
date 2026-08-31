@@ -476,7 +476,6 @@ searchInput.addEventListener("input", async () => {
     if (isTrigger) {
       if (adminWrap) {
         adminWrap.style.display = "";
-        sessionStorage.setItem("elibrary_admin_unlocked", "true");
         apiKeyInput.focus();
       }
       searchInput.value = "";
@@ -622,16 +621,12 @@ if (filterCategorySelect) {
   });
 }
 
-const storedKey = getApiKey();
-const isUnlocked = sessionStorage.getItem("elibrary_admin_unlocked") === "true";
 if (adminWrap) {
-  if (storedKey || isUnlocked) {
-    adminWrap.style.display = "";
-  } else {
-    adminWrap.style.display = "none";
-  }
+  adminWrap.style.display = "none";
 }
+sessionStorage.removeItem("elibrary_admin_unlocked");
 
+const storedKey = getApiKey();
 apiKeyInput.value = storedKey;
 updateAdminUI();
 footerYear.textContent = new Date().getFullYear();
