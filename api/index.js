@@ -84,6 +84,16 @@ export default async function handler(req, res) {
       return res.status(401).json({ error: "Unauthorized" });
     }
 
+    if (method === "POST" && parts[0] === "api" && parts[1] === "auth" && parts[2] === "trigger" && parts.length === 3) {
+      const body = req.body || (await readJsonBody(req));
+      const inputTrigger = body?.trigger;
+      const expectedTrigger = process.env.ADMIN_SEARCH_TRIGGER || process.env.ADMIN_TRIGGER_KEY || "Admin API key";
+      if (typeof inputTrigger === "string" && inputTrigger === expectedTrigger) {
+        return res.status(200).json({ unlocked: true });
+      }
+      return res.status(200).json({ unlocked: false });
+    }
+
     if (method === "GET" && parts[0] === "api" && parts[1] === "books" && parts.length === 3) {
       const book = await getBook(parts[2]);
       if (!book) return res.status(404).json({ error: "Book not found" });

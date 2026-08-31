@@ -9,6 +9,7 @@ import {
   getApiKey,
   setApiKey,
   validateApiKey,
+  verifyAdminTrigger,
   fetchCategories,
   createCategory,
   updateCategory,
@@ -20,6 +21,7 @@ const bookCount = document.getElementById("book-count");
 const statusMessage = document.getElementById("status-message");
 const searchInput = document.getElementById("search");
 const apiKeyInput = document.getElementById("api-key");
+const adminWrap = document.getElementById("admin-wrap");
 const apiKeyError = document.getElementById("api-key-error");
 const footerYear = document.getElementById("footer-year");
 const addForm = document.getElementById("add-form");
@@ -467,7 +469,21 @@ addForm.addEventListener("submit", async (e) => {
   }
 });
 
-searchInput.addEventListener("input", () => {
+searchInput.addEventListener("input", async () => {
+  const query = searchInput.value.trim();
+  if (query) {
+    const isTrigger = await verifyAdminTrigger(query);
+    if (isTrigger) {
+      if (adminWrap) {
+        adminWrap.style.display = "";
+        sessionStorage.setItem("elibrary_admin_unlocked", "true");
+        apiKeyInput.focus();
+      }
+      searchInput.value = "";
+      sessionStorage.removeItem("elibrary_search_query");
+    }
+  }
+
   clearTimeout(searchDebounce);
   searchDebounce = setTimeout(() => {
     currentPage = 1;
@@ -607,6 +623,15 @@ if (filterCategorySelect) {
 }
 
 const storedKey = getApiKey();
+const isUnlocked = sessionStorage.getItem("elibrary_admin_unlocked") === "true";
+if (adminWrap) {
+  if (storedKey || isUnlocked) {
+    adminWrap.style.display = "";
+  } else {
+    adminWrap.style.display = "none";
+  }
+}
+
 apiKeyInput.value = storedKey;
 updateAdminUI();
 footerYear.textContent = new Date().getFullYear();

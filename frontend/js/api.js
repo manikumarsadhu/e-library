@@ -61,6 +61,22 @@ export async function validateApiKey(key) {
   }
 }
 
+export async function verifyAdminTrigger(trigger) {
+  if (!trigger) return false;
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/auth/trigger`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      body: JSON.stringify({ trigger }),
+    });
+    if (!res.ok) return false;
+    const data = await res.json();
+    return Boolean(data.unlocked);
+  } catch {
+    return false;
+  }
+}
+
 export async function fetchBooks(query = "", page = 1, limit = 20, category_id = "") {
   const url = new URL(`${API_BASE_URL}/api/books`);
   if (query.trim()) url.searchParams.set("q", query.trim());
