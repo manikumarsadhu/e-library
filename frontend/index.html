@@ -4,9 +4,14 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
+    <!-- Google Fonts: Outfit & Plus Jakarta Sans -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+
     <!-- Primary SEO -->
     <title>E-Library — Free Digital Library & AI PDF Reader | Read Books Online</title>
-    <meta name="description" content="Access a free online digital library and AI-powered PDF reader. Read books online, chat with AI about any document, bookmark chapters, and listen with text-to-speech." />
+    <meta name="description" content="Access a free online digital library and AI-powered PDF reader. Read books online, chat with Gemini AI about any document, bookmark chapters, and listen with text-to-speech." />
     <meta name="keywords" content="free digital library, online pdf reader, read books online free, AI PDF reader, chat with PDF, AI book reader, free ebook library, PDF text to speech, digital library platform, read pdf online free, AI reading assistant, online document reader, digital book reader, smart library" />
     <meta name="author" content="E-Library" />
     <meta name="robots" content="index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1" />
@@ -67,7 +72,7 @@
     }
     </script>
 
-    <!-- Structured Data: FAQPage (Enables Google Rich Results) -->
+    <!-- Structured Data: FAQPage -->
     <script type="application/ld+json">
     {
       "@context": "https://schema.org",
@@ -104,17 +109,230 @@
     <!-- Favicon -->
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📖</text></svg>">
     <link rel="stylesheet" href="css/styles.css" />
-
   </head>
   <body>
-    <header class="site-header">
-      <div class="container">
-        <h1>E-Library</h1>
-        <p class="tagline">Discover, read, and organize your books seamlessly</p>
+    <!-- ─────────────────────────────────────────────────────────
+         Frosted Glass Navigation Bar
+         ───────────────────────────────────────────────────────── -->
+    <nav class="site-nav" aria-label="Main Navigation">
+      <div class="container nav-container">
+        <a href="#home" class="brand-logo" aria-label="E-Library Home">
+          <span class="brand-icon">📖</span>
+          <span class="brand-name">E-Library</span>
+          <span class="brand-pill">AI 2.0</span>
+        </a>
+        <div class="nav-links">
+          <a href="#features" class="nav-link">Features</a>
+          <a href="#catalog" class="nav-link">Catalog</a>
+          <a href="#vault" id="nav-vault-link" class="nav-link">Private Vault</a>
+        </div>
+        <div class="nav-cta-wrap">
+          <button type="button" id="nav-add-btn" class="btn btn-primary nav-cta">+ Add Book</button>
+        </div>
+      </div>
+    </nav>
+
+    <!-- ─────────────────────────────────────────────────────────
+         Hero Section with Floating Orbs & Live Interactive Preview
+         ───────────────────────────────────────────────────────── -->
+    <header class="landing-hero" id="home" aria-labelledby="hero-title">
+      <div class="glow-orb orb-1" aria-hidden="true"></div>
+      <div class="glow-orb orb-2" aria-hidden="true"></div>
+      <div class="glow-orb orb-3" aria-hidden="true"></div>
+
+      <div class="container hero-container">
+        <div class="hero-content">
+          <div class="hero-badge">
+            <span class="badge-dot"></span>
+            <span>Next-Gen AI Book Reader & Personal Vault</span>
+          </div>
+          <h1 id="hero-title" class="hero-title">
+            Your Digital Library, <br />
+            <span class="gradient-text">Reimagined with AI.</span>
+          </h1>
+          <p class="hero-description">
+            Read PDFs in dark mode, ask questions to Gemini AI, listen with text-to-speech, and store books directly from your Google Drive with private PIN protection.
+          </p>
+
+          <div class="hero-cta-group">
+            <a href="#catalog" class="btn btn-hero-primary" id="hero-browse-btn">
+              Explore Library
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="12" y1="5" x2="12" y2="19"></line>
+                <polyline points="19 12 12 19 5 12"></polyline>
+              </svg>
+            </a>
+            <button type="button" class="btn btn-hero-secondary" id="hero-add-btn">
+              <span>+</span> Upload with Google Drive
+            </button>
+          </div>
+
+          <div class="hero-stats-row">
+            <div class="stat-item">
+              <span class="stat-number">100% Free</span>
+              <span class="stat-label">In-Browser Reader</span>
+            </div>
+            <div class="stat-divider"></div>
+            <div class="stat-item">
+              <span class="stat-number">Gemini AI</span>
+              <span class="stat-label">Page Assistant</span>
+            </div>
+            <div class="stat-divider"></div>
+            <div class="stat-item">
+              <span class="stat-number">Google Drive</span>
+              <span class="stat-label">Direct Storage</span>
+            </div>
+            <div class="stat-divider"></div>
+            <div class="stat-item">
+              <span class="stat-number">PIN Vault</span>
+              <span class="stat-label">Private & Passwordless</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Interactive Hero Showcase Card -->
+        <div class="hero-showcase" aria-label="Interactive AI PDF Reader demo preview">
+          <div class="showcase-card glass-panel">
+            <div class="showcase-header">
+              <div class="browser-dots">
+                <span class="dot dot-red"></span>
+                <span class="dot dot-yellow"></span>
+                <span class="dot dot-green"></span>
+              </div>
+              <span class="showcase-title">AI PDF Reader &bull; Active Session</span>
+              <span class="showcase-status">&bull; Live</span>
+            </div>
+
+            <div class="showcase-body">
+              <div class="showcase-book-mini">
+                <div class="mini-cover">📖</div>
+                <div class="mini-meta">
+                  <strong>Reading in Progress</strong>
+                  <span>Chapter 3: Foundations & Principles</span>
+                  <div class="mini-progress-bar"><div class="mini-progress-fill" style="width: 65%;"></div></div>
+                </div>
+              </div>
+
+              <div class="showcase-ai-bubble">
+                <div class="ai-bubble-header">
+                  <span class="ai-sparkle">✨</span>
+                  <strong>Gemini AI Assistant</strong>
+                  <span class="ai-tag" id="showcase-ai-tag">Page 42 Analysis</span>
+                </div>
+                <p id="showcase-ai-text">
+                  &ldquo;Here are the 3 core insights from this chapter: First, active inquiry deepens retention. Second, contextual bookmarks allow instant revision. Third, text-to-speech reinforces comprehension.&rdquo;
+                </p>
+                <div class="showcase-prompt-chips">
+                  <button type="button" class="prompt-chip active" data-prompt="summary">💡 Summary</button>
+                  <button type="button" class="prompt-chip" data-prompt="quiz">❓ Quick Quiz</button>
+                  <button type="button" class="prompt-chip" data-prompt="explain">🧠 Explain</button>
+                </div>
+              </div>
+
+              <div class="showcase-tts-badge">
+                <span class="tts-icon">🎧</span>
+                <span id="showcase-tts-label">Text-to-Speech active at 1.25x speed</span>
+                <div class="audio-wave"><span></span><span></span><span></span><span></span></div>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     </header>
 
-    <main class="container">
+    <!-- ─────────────────────────────────────────────────────────
+         Bento Grid Features Showcase
+         ───────────────────────────────────────────────────────── -->
+    <section id="features" class="features-section" aria-labelledby="features-heading">
+      <div class="container">
+        <div style="text-align: center;">
+          <div class="section-badge-center">
+            <span class="badge-dot"></span> Powerful Capabilities
+          </div>
+        </div>
+        <h2 id="features-heading" class="section-title-center">
+          Everything You Need for <span class="gradient-text">Effortless Reading</span>
+        </h2>
+        <p class="section-subtitle-center">
+          Built for students, researchers, readers, and creators who want more than just a basic PDF viewer.
+        </p>
+
+        <div class="bento-grid">
+          <!-- Feature 1: AI Assistant (Hero Card) -->
+          <div class="bento-card bento-hero-card">
+            <div class="bento-icon">🤖</div>
+            <h3>Gemini AI Page Assistant</h3>
+            <p>Chat directly with any page of your book. Ask questions, generate 3-bullet summaries, and analyze complex concepts without losing your reading flow.</p>
+            <div class="bento-pill-group">
+              <span class="bento-pill">Page Summaries</span>
+              <span class="bento-pill">Q&A Chat</span>
+              <span class="bento-pill">Concept Explanations</span>
+            </div>
+          </div>
+
+          <!-- Feature 2: Google Drive Storage -->
+          <div class="bento-card">
+            <div class="bento-icon">☁️</div>
+            <h3>Your Own Google Drive</h3>
+            <p>No storage limits. Paste any public Google Drive link or Doc export, and read it in our reader with zero upload storage overhead.</p>
+            <div class="bento-pill-group">
+              <span class="bento-pill">Zero Upload Quota</span>
+              <span class="bento-pill">Direct PDF Streaming</span>
+            </div>
+          </div>
+
+          <!-- Feature 3: Private Passcode Vault -->
+          <div class="bento-card" id="vault">
+            <div class="bento-icon">🔐</div>
+            <h3>Private PIN Vault</h3>
+            <p>Keep personal study notes and private books confidential. Unlock your private collection with a secret 4+ char passcode—no sign-ups or passwords required.</p>
+            <div class="bento-pill-group">
+              <span class="bento-pill">No Account Required</span>
+              <span class="bento-pill">SHA-256 Protected</span>
+            </div>
+          </div>
+
+          <!-- Feature 4: Smart Text-to-Speech -->
+          <div class="bento-card">
+            <div class="bento-icon">🎧</div>
+            <h3>Smart Text-to-Speech</h3>
+            <p>Listen hands-free while exercising, cooking, or resting. Enjoy real-time synchronized karaoke sentence highlighting and adjustable speech speeds.</p>
+            <div class="bento-pill-group">
+              <span class="bento-pill">Speed Control</span>
+              <span class="bento-pill">Sentence Highlight</span>
+            </div>
+          </div>
+
+          <!-- Feature 5: Eye-Care Themes -->
+          <div class="bento-card">
+            <div class="bento-icon">🌙</div>
+            <h3>Dark, OLED & Sepia Themes</h3>
+            <p>Eliminate screen fatigue with custom inverted dark themes, pure OLED black for battery saving, warm sepia, and dyslexia-friendly typography.</p>
+            <div class="bento-pill-group">
+              <span class="bento-pill">OLED Black</span>
+              <span class="bento-pill">Sepia Comfort</span>
+              <span class="bento-pill">Dyslexic Font</span>
+            </div>
+          </div>
+
+          <!-- Feature 6: Auto Chapter Detection -->
+          <div class="bento-card">
+            <div class="bento-icon">📑</div>
+            <h3>AI Chapter Detection</h3>
+            <p>Document missing an outline? Our AI analyzes font weights and headings to automatically extract and navigate chapters with thumbnail previews.</p>
+            <div class="bento-pill-group">
+              <span class="bento-pill">Visual Thumbnails</span>
+              <span class="bento-pill">Jump-to-Chapter</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ─────────────────────────────────────────────────────────
+         Live Catalog & Reading Library
+         ───────────────────────────────────────────────────────── -->
+    <main class="container catalog-section" id="catalog">
       <section class="toolbar" aria-label="Search and admin">
         <!-- Hidden dummy inputs to catch browser password manager autofill heuristics -->
         <input type="text" name="prevent_autofill_username" style="display:none" tabindex="-1" autocomplete="off" />
@@ -134,8 +352,22 @@
         <div class="filter-wrap">
           <label for="filter-category" class="visually-hidden">Filter by Category</label>
           <select id="filter-category" class="filter-category">
-            <option value="">All</option>
+            <option value="">All Categories</option>
           </select>
+        </div>
+        <div class="pin-wrap">
+          <label for="collection-pin" class="visually-hidden">Unlock Private Collection</label>
+          <input
+            type="password"
+            id="collection-pin"
+            name="collection_pin"
+            placeholder="Passcode for private books…"
+            autocomplete="off"
+            title="Enter passcode to reveal your private collection"
+          />
+        </div>
+        <div class="add-btn-wrap">
+          <button type="button" id="toggle-add-btn" class="btn btn-primary add-nav-btn" aria-expanded="false" aria-controls="add-book-section">+ Add Book</button>
         </div>
         <div class="admin-wrap" id="admin-wrap" style="display: none;">
           <label for="api-key" class="admin-label">Admin API key</label>
@@ -152,9 +384,20 @@
         </div>
       </section>
 
-      <section class="add-book" aria-labelledby="add-heading">
-        <h2 id="add-heading">Add a book</h2>
+      <!-- Collapsible Add a Book Drawer -->
+      <section id="add-book-section" class="add-book" aria-labelledby="add-heading" style="display: none;">
+        <div class="add-header-row">
+          <h2 id="add-heading">Add a book</h2>
+          <button type="button" id="close-add-btn" class="btn btn-secondary close-add-btn" aria-label="Close Add book section">&times; Close</button>
+        </div>
         <form id="add-form" class="add-form">
+          <div class="form-row">
+            <label for="storage-source">Storage</label>
+            <select id="storage-source" name="storage_source">
+              <option value="gdrive" selected>Google Drive (Customer Storage)</option>
+              <option value="cloudinary" class="admin-only-option" style="display: none;">Cloudinary Upload (Admin Only)</option>
+            </select>
+          </div>
           <div class="form-row">
             <label for="title">Title</label>
             <input type="text" id="title" name="title" required maxlength="255" />
@@ -180,38 +423,74 @@
               <option value="">None</option>
             </select>
           </div>
-          <div class="form-row">
-            <label for="cover">Cover image (optional)</label>
-            <input
-              type="file"
-              id="cover"
-              name="cover"
-              accept="image/jpeg,image/png,image/webp,image/gif"
-              aria-describedby="cover-help"
-            />
-            <p id="cover-help" class="input-help">JPEG, PNG, WebP, or GIF.</p>
+          <div id="gdrive-fields">
+            <div class="form-row">
+              <label for="gdrive-url">Google Drive Link</label>
+              <input
+                type="url"
+                id="gdrive-url"
+                name="gdrive_url"
+                placeholder="https://drive.google.com/file/d/.../view?usp=sharing"
+                aria-describedby="gdrive-help"
+              />
+              <p id="gdrive-help" class="input-help">Share file on Google Drive as &ldquo;Anyone with the link can view&rdquo;, then paste link here.</p>
+            </div>
+            <div class="form-row">
+              <label for="visibility">Visibility</label>
+              <select id="visibility" name="visibility">
+                <option value="public" selected>Public (Visible to everyone)</option>
+                <option value="private">Private (Only unlocked with passcode)</option>
+              </select>
+            </div>
+            <div class="form-row">
+              <label for="passcode">Creator Passcode</label>
+              <input
+                type="password"
+                id="passcode"
+                name="passcode"
+                placeholder="Choose a 4+ char passcode"
+                minlength="4"
+                aria-describedby="passcode-help"
+              />
+              <p id="passcode-help" class="input-help">Used to unlock private view and manage or delete your book.</p>
+            </div>
           </div>
-          <div class="form-row">
-            <label for="pdf">PDF file (optional)</label>
-            <input
-              type="file"
-              id="pdf"
-              name="pdf"
-              accept="application/pdf"
-              aria-describedby="pdf-help"
-            />
-            <p id="pdf-help" class="input-help">Upload a PDF to enable the in-browser reader.</p>
+          <div id="cloudinary-fields" style="display: none;">
+            <div class="form-row">
+              <label for="cover">Cover image (optional)</label>
+              <input
+                type="file"
+                id="cover"
+                name="cover"
+                accept="image/jpeg,image/png,image/webp,image/gif"
+                aria-describedby="cover-help"
+              />
+              <p id="cover-help" class="input-help">JPEG, PNG, WebP, or GIF.</p>
+            </div>
+            <div class="form-row">
+              <label for="pdf">PDF file (optional)</label>
+              <input
+                type="file"
+                id="pdf"
+                name="pdf"
+                accept="application/pdf"
+                aria-describedby="pdf-help"
+              />
+              <p id="pdf-help" class="input-help">Upload a PDF to enable the in-browser reader.</p>
+            </div>
           </div>
           <div class="form-actions">
             <button type="submit" class="btn btn-primary">Add book</button>
             <button type="reset" class="btn btn-secondary">Clear</button>
+            <button type="button" id="cancel-add-btn" class="btn btn-secondary">Close</button>
           </div>
         </form>
       </section>
 
+      <!-- Live Catalog Grid -->
       <section class="catalog" aria-labelledby="catalog-heading">
         <div class="catalog-header">
-          <h2 id="catalog-heading">Catalog</h2>
+          <h2 id="catalog-heading">Explore Catalog</h2>
           <p id="book-count" class="book-count" aria-live="polite"></p>
         </div>
         <p id="status-message" class="status-message" role="status" aria-live="polite"></p>
@@ -225,6 +504,9 @@
       </section>
     </main>
 
+    <!-- ─────────────────────────────────────────────────────────
+         Edit Modal
+         ───────────────────────────────────────────────────────── -->
     <dialog id="edit-modal" class="edit-modal" aria-labelledby="edit-heading">
       <form id="edit-form" class="edit-form" method="dialog">
         <h2 id="edit-heading">Edit book</h2>
@@ -283,6 +565,9 @@
       </form>
     </dialog>
 
+    <!-- ─────────────────────────────────────────────────────────
+         Categories Management Modal
+         ───────────────────────────────────────────────────────── -->
     <dialog id="category-modal" class="category-modal" aria-labelledby="category-heading-modal">
       <div class="category-modal-content">
         <h2 id="category-heading-modal">Manage Categories</h2>
@@ -307,16 +592,42 @@
       </div>
     </dialog>
 
+    <!-- ─────────────────────────────────────────────────────────
+         Modern Footer
+         ───────────────────────────────────────────────────────── -->
     <footer class="site-footer">
       <div class="container">
-        <p>&copy; <span id="footer-year"></span> E-Library. Developed by Mani Kumar Sadhu.</p>
+        <div class="footer-top">
+          <div class="footer-brand">
+            <h4>📖 E-Library</h4>
+            <p>A modern, free digital reading platform powered by Google Gemini AI and serverless cloud storage. Read, listen, analyze, and organize books seamlessly.</p>
+          </div>
+          <div class="footer-col">
+            <h5>Navigation</h5>
+            <ul class="footer-links">
+              <li><a href="#home">Home</a></li>
+              <li><a href="#features">Features</a></li>
+              <li><a href="#catalog">Catalog</a></li>
+              <li><a href="#vault">Private Vault</a></li>
+            </ul>
+          </div>
+          <div class="footer-col">
+            <h5>Technology</h5>
+            <ul class="footer-links">
+              <li><a href="https://deepmind.google/technologies/gemini/" target="_blank" rel="noopener">Google Gemini 2.0</a></li>
+              <li><a href="https://mozilla.github.io/pdf.js/" target="_blank" rel="noopener">PDF.js Engine</a></li>
+              <li><a href="https://www.google.com/drive/" target="_blank" rel="noopener">Google Drive API</a></li>
+              <li><a href="https://en.wikipedia.org/wiki/SHA-2" target="_blank" rel="noopener">SHA-256 Vault</a></li>
+            </ul>
+          </div>
+        </div>
+        <div class="footer-bottom">
+          <p>&copy; <span id="footer-year"></span> E-Library. All rights reserved.</p>
+          <p>Designed &amp; Developed with modern web standards.</p>
+        </div>
       </div>
     </footer>
-
-
 
     <script type="module" src="js/app.js"></script>
   </body>
 </html>
-
-

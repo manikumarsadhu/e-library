@@ -2,9 +2,15 @@ import crypto from "crypto";
 import { deleteCloudinaryAsset } from "./cloudinary.js";
 import { getDb, getRows } from "./db.js";
 import { escapeLike } from "./search.js";
+import {
+  parseGoogleDriveFileId,
+  makeGoogleDriveKey,
+  hashPasscode,
+  verifyPasscode,
+} from "./gdrive.js";
 
 const BOOK_COLUMNS =
-  "id, title, author, year, cover_key, file_key, outline, category_id, created_at, updated_at";
+  "id, title, author, year, cover_key, file_key, outline, category_id, storage_source, visibility, passcode_hash, created_at, updated_at";
 
 export function rowToBook(row) {
   return {
@@ -16,6 +22,9 @@ export function rowToBook(row) {
     file_key: row.file_key,
     outline: row.outline ?? null,
     category_id: row.category_id ?? null,
+    storage_source: row.storage_source || "cloudinary",
+    visibility: row.visibility || "public",
+    has_passcode: Boolean(row.passcode_hash),
     created_at: row.created_at,
     updated_at: row.updated_at,
   };
@@ -25,7 +34,7 @@ export function computePageOffset(page, limit) {
   return (page - 1) * limit;
 }
 
-export async function listBooks({ query, page, limit, category_id }) {
+export async function listBooks({ query, page, limit, category_id, passcode, scope, isAdmin }) {
   const db = getDb();
   const q = (query || "").trim();
   const offset = computePageOffset(page, limit);
@@ -46,6 +55,28 @@ export async function listBooks({ query, page, limit, category_id }) {
     params.push(category_id);
   }
 
+  // Access control:
+  // Admin sees all books.
+  // When a visitor enters their passcode/PIN:
+  // - Default: Filter directly to their collection (books uploaded with that passcode).
+  // - If scope === "all": Include all public books with matching books prioritized first.
+  // When no passcode is entered: Show all public books.
+  let pinHash = null;
+  if (!isAdmin) {
+    if (passcode && typeof passcode === "string" && passcode.trim()) {
+      pinHash = hashPasscode(passcode);
+      if (scope === "all") {
+        whereClauses.push(`(visibility = 'public' OR passcode_hash = ?)`);
+        params.push(pinHash);
+      } else {
+        whereClauses.push(`passcode_hash = ?`);
+        params.push(pinHash);
+      }
+    } else {
+      whereClauses.push(`visibility = 'public'`);
+    }
+  }
+
   const whereSql = whereClauses.length > 0 ? `WHERE ${whereClauses.join(" AND ")}` : "";
 
   const countResult = await db.execute(
@@ -54,9 +85,14 @@ export async function listBooks({ query, page, limit, category_id }) {
   );
   const total = Number(getRows(countResult)[0]?.total || 0);
 
+  const orderSql = (scope === "all" && pinHash)
+    ? `ORDER BY (passcode_hash = ?) DESC, title ASC`
+    : `ORDER BY title ASC`;
+  const orderParams = (scope === "all" && pinHash) ? [pinHash] : [];
+
   const listResult = await db.execute(
-    `SELECT ${BOOK_COLUMNS} FROM books ${whereSql} ORDER BY title ASC LIMIT ? OFFSET ?`,
-    [...params, limit, offset]
+    `SELECT ${BOOK_COLUMNS} FROM books ${whereSql} ${orderSql} LIMIT ? OFFSET ?`,
+    [...params, ...orderParams, limit, offset]
   );
   const books = getRows(listResult).map(rowToBook);
 
@@ -79,8 +115,17 @@ export async function getBook(id) {
   return row ? rowToBook(row) : null;
 }
 
-export async function createBook(body) {
-  const { title, author, year, category_id } = body || {};
+export async function getBookSecret(id) {
+  const db = getDb();
+  const result = await db.execute(
+    `SELECT id, passcode_hash, storage_source, cover_key, file_key, visibility FROM books WHERE id = ? LIMIT 1`,
+    [id]
+  );
+  return getRows(result)[0] || null;
+}
+
+export async function createBook(body, { isAdmin = false } = {}) {
+  const { title, author, year, category_id, gdrive_url, passcode, visibility } = body || {};
   if (typeof title !== "string" || typeof author !== "string") {
     throw new Error("title and author are required");
   }
@@ -106,11 +151,34 @@ export async function createBook(body) {
     validCategoryId = category_id.trim();
   }
 
+  let storageSource = "cloudinary";
+  let fileKey = null;
+  let passcodeHash = null;
+  const bookVisibility = visibility === "private" ? "private" : "public";
+
+  if (gdrive_url) {
+    const fileId = parseGoogleDriveFileId(gdrive_url);
+    if (!fileId) {
+      throw new Error("Invalid Google Drive link. Please paste a valid Google Drive share link or file ID.");
+    }
+    storageSource = "gdrive";
+    fileKey = makeGoogleDriveKey(fileId);
+
+    // Customer uploads require a passcode so they can manage/unlock their books
+    if (!isAdmin && (!passcode || typeof passcode !== "string" || passcode.trim().length < 4)) {
+      throw new Error("A passcode of at least 4 characters is required to upload your book.");
+    }
+  }
+
+  if (passcode && typeof passcode === "string" && passcode.trim()) {
+    passcodeHash = hashPasscode(passcode);
+  }
+
   const id = crypto.randomUUID();
   const db = getDb();
   await db.execute(
-    `INSERT INTO books (id, title, author, year, category_id) VALUES (?, ?, ?, ?, ?)`,
-    [id, trimmedTitle, trimmedAuthor, validYear, validCategoryId]
+    `INSERT INTO books (id, title, author, year, category_id, storage_source, visibility, passcode_hash, file_key) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [id, trimmedTitle, trimmedAuthor, validYear, validCategoryId, storageSource, bookVisibility, passcodeHash, fileKey]
   );
   return getBook(id);
 }
@@ -178,12 +246,23 @@ export async function setBookAssetKey(bookId, kind, key) {
   await db.execute(`UPDATE books SET ${column} = ? WHERE id = ?`, [key, bookId]);
 }
 
-export async function deleteBook(id) {
-  const existing = await getBook(id);
-  if (!existing) return false;
+export async function deleteBook(id, { passcode, isAdmin = false } = {}) {
+  const secret = await getBookSecret(id);
+  if (!secret) return false;
 
-  await deleteCloudinaryAsset(existing.cover_key);
-  await deleteCloudinaryAsset(existing.file_key);
+  if (!isAdmin) {
+    if (!secret.passcode_hash) {
+      throw new Error("Admin authorization required to delete this book");
+    }
+    if (!verifyPasscode(passcode, secret.passcode_hash)) {
+      throw new Error("Incorrect passcode for this book");
+    }
+  }
+
+  if (secret.storage_source === "cloudinary") {
+    await deleteCloudinaryAsset(secret.cover_key);
+    await deleteCloudinaryAsset(secret.file_key);
+  }
 
   const db = getDb();
   await db.execute(`DELETE FROM books WHERE id = ?`, [id]);

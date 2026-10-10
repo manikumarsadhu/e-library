@@ -67,6 +67,17 @@ const server = http.createServer((req, res) => {
     return res;
   };
 
+  // Safely handle client disconnects on req, res, and socket
+  req.on("error", (err) => {
+    if (err.code !== "ECONNRESET") console.warn("Client req error:", err.message);
+  });
+  res.on("error", (err) => {
+    if (err.code !== "ECONNRESET" && err.code !== "EPIPE") console.warn("Client res error:", err.message);
+  });
+  req.socket?.on("error", (err) => {
+    if (err.code !== "ECONNRESET" && err.code !== "EPIPE") console.warn("Client socket error:", err.message);
+  });
+
   const parsedUrl = new URL(req.url, `http://${req.headers.host || "localhost"}`);
   const pathname = parsedUrl.pathname;
 
@@ -86,11 +97,21 @@ const server = http.createServer((req, res) => {
         } catch (_err) {
           req.body = {};
         }
-        handler(req, res);
+        Promise.resolve(handler(req, res)).catch((err) => {
+          if (!res.destroyed && !res.writableEnded) {
+            res.statusCode = 500;
+            res.end(JSON.stringify({ error: err?.message || "Internal server error" }));
+          }
+        });
       });
     } else {
       // Direct pass for GET, DELETE, and multipart/form-data POST (parsed via busboy)
-      handler(req, res);
+      Promise.resolve(handler(req, res)).catch((err) => {
+        if (!res.destroyed && !res.writableEnded) {
+          res.statusCode = 500;
+          res.end(JSON.stringify({ error: err?.message || "Internal server error" }));
+        }
+      });
     }
   } else {
     // Serve static files from the frontend folder
@@ -110,10 +131,40 @@ const server = http.createServer((req, res) => {
       const ext = path.extname(filePath).toLowerCase();
       const contentType = MIME_TYPES[ext] || "application/octet-stream";
 
+      if (res.destroyed || res.writableEnded) return;
+
       res.writeHead(200, { "Content-Type": contentType });
-      fs.createReadStream(filePath).pipe(res);
+      const stream = fs.createReadStream(filePath);
+      stream.on("error", () => {
+        if (!res.destroyed && !res.headersSent) {
+          res.writeHead(500, { "Content-Type": "text/plain" });
+          res.end("Internal Server Error");
+        }
+      });
+      res.on("close", () => {
+        stream.destroy();
+      });
+      stream.pipe(res);
     });
   }
+});
+
+server.on("error", (err) => {
+  console.error("Server error:", err);
+});
+
+process.on("uncaughtException", (err) => {
+  if (err?.code === "ECONNRESET" || err?.code === "EPIPE" || err?.code === "ERR_STREAM_PREMATURE_CLOSE") {
+    return; // Normal browser navigation disconnect (e.g. user pressed Back or refreshed)
+  }
+  console.error("Uncaught exception in dev server:", err);
+});
+
+process.on("unhandledRejection", (err) => {
+  if (err?.code === "ECONNRESET" || err?.code === "EPIPE" || err?.code === "ERR_STREAM_PREMATURE_CLOSE") {
+    return;
+  }
+  console.error("Unhandled rejection in dev server:", err);
 });
 
 server.listen(PORT, () => {

@@ -77,13 +77,29 @@ export async function verifyAdminTrigger(trigger) {
   }
 }
 
-export async function fetchBooks(query = "", page = 1, limit = 20, category_id = "") {
+const USER_PIN_STORAGE = "elibrary_user_pin";
+
+export function getUserPin() {
+  return sessionStorage.getItem(USER_PIN_STORAGE) || "";
+}
+
+export function setUserPin(pin) {
+  if (pin) {
+    sessionStorage.setItem(USER_PIN_STORAGE, pin.trim());
+  } else {
+    sessionStorage.removeItem(USER_PIN_STORAGE);
+  }
+}
+
+export async function fetchBooks(query = "", page = 1, limit = 20, category_id = "", pin = "") {
   const url = new URL(`${API_BASE_URL}/api/books`);
   if (query.trim()) url.searchParams.set("q", query.trim());
   url.searchParams.set("page", String(page));
   url.searchParams.set("limit", String(limit));
   if (category_id) url.searchParams.set("category_id", category_id);
-  const res = await fetch(url.toString(), { headers: headers() });
+  const activePin = pin || getUserPin();
+  if (activePin) url.searchParams.set("pin", activePin);
+  const res = await fetch(url.toString(), { headers: headers(true) });
   const data = await parseResponse(res);
   return {
     books: data.books || [],
@@ -114,11 +130,19 @@ export async function updateBook(id, payload) {
   return data.book;
 }
 
-
-export async function deleteBook(id) {
-  const res = await fetch(`${API_BASE_URL}/api/books/${id}`, {
+export async function deleteBook(id, pin = "") {
+  const h = headers(true);
+  const activePin = pin || getUserPin();
+  if (activePin) {
+    h["x-access-pin"] = activePin;
+  }
+  const url = new URL(`${API_BASE_URL}/api/books/${id}`);
+  if (activePin) {
+    url.searchParams.set("pin", activePin);
+  }
+  const res = await fetch(url.toString(), {
     method: "DELETE",
-    headers: headers(true),
+    headers: h,
   });
   return parseResponse(res);
 }

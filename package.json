@@ -8,7 +8,7 @@
     "deploy": "vercel deploy --prod",
     "lint": "eslint api/ frontend/js/ dev-server.js",
     "lint:fix": "eslint api/ frontend/js/ dev-server.js --fix",
-    "test": "node --test tests/auth.test.js tests/books.test.js tests/search.test.js"
+    "test": "node --test tests/auth.test.js tests/books.test.js tests/search.test.js tests/viewer-layout.test.js"
   },
   "dependencies": {
     "@google/genai": "^2.8.0",

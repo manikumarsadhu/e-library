@@ -66,6 +66,29 @@ async function run() {
       console.log("category_id column already exists, skipping ALTER TABLE.");
     }
 
+    // 3. Check and add storage_source, visibility, and passcode_hash columns
+    console.log("Checking storage_source, visibility, passcode_hash columns...");
+    const checkColumns = await db.execute(`
+      SELECT COLUMN_NAME 
+      FROM INFORMATION_SCHEMA.COLUMNS 
+      WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'books' AND COLUMN_NAME IN ('storage_source', 'visibility', 'passcode_hash')
+    `, [database]);
+
+    const existingCols = new Set((checkColumns?.rows || checkColumns || []).map(r => r.COLUMN_NAME || r.column_name));
+
+    if (!existingCols.has("storage_source")) {
+      console.log("Adding storage_source column to books...");
+      await db.execute(`ALTER TABLE books ADD COLUMN storage_source VARCHAR(32) NOT NULL DEFAULT 'cloudinary'`);
+    }
+    if (!existingCols.has("visibility")) {
+      console.log("Adding visibility column to books...");
+      await db.execute(`ALTER TABLE books ADD COLUMN visibility VARCHAR(16) NOT NULL DEFAULT 'public'`);
+    }
+    if (!existingCols.has("passcode_hash")) {
+      console.log("Adding passcode_hash column to books...");
+      await db.execute(`ALTER TABLE books ADD COLUMN passcode_hash VARCHAR(128) NULL`);
+    }
+
     console.log("Migrations ran successfully!");
     process.exit(0);
   } catch (err) {

@@ -14,17 +14,33 @@ import {
   createCategory,
   updateCategory,
   deleteCategory,
+  getUserPin,
+  setUserPin,
 } from "./api.js";
 
 const bookList = document.getElementById("book-list");
 const bookCount = document.getElementById("book-count");
 const statusMessage = document.getElementById("status-message");
 const searchInput = document.getElementById("search");
+const collectionPinInput = document.getElementById("collection-pin");
+const storageSourceSelect = document.getElementById("storage-source");
+const gdriveFields = document.getElementById("gdrive-fields");
+const cloudinaryFields = document.getElementById("cloudinary-fields");
 const apiKeyInput = document.getElementById("api-key");
 const adminWrap = document.getElementById("admin-wrap");
 const apiKeyError = document.getElementById("api-key-error");
 const footerYear = document.getElementById("footer-year");
 const addForm = document.getElementById("add-form");
+const addBookSection = document.getElementById("add-book-section");
+const toggleAddBtn = document.getElementById("toggle-add-btn");
+const closeAddBtn = document.getElementById("close-add-btn");
+const cancelAddBtn = document.getElementById("cancel-add-btn");
+const navAddBtn = document.getElementById("nav-add-btn");
+const heroAddBtn = document.getElementById("hero-add-btn");
+const navVaultLink = document.getElementById("nav-vault-link");
+const showcaseAiText = document.getElementById("showcase-ai-text");
+const showcaseAiTag = document.getElementById("showcase-ai-tag");
+const promptChips = document.querySelectorAll(".prompt-chip");
 const pager = document.getElementById("pager");
 const retryLoadBtn = document.getElementById("retry-load");
 const prevPageBtn = document.getElementById("prev-page");
@@ -85,28 +101,35 @@ function getPdfThumbnailUrl(fileKey) {
       return thumbUrl;
     }
   }
+  if (fileKey.startsWith("gdrive:")) {
+    const fileId = fileKey.slice(7).trim();
+    if (fileId) {
+      return `/api/drive/${encodeURIComponent(fileId)}/thumbnail`;
+    }
+  }
   return null;
 }
 
 function renderCover(book) {
   const wrap = createEl("div", "book-cover");
-  if (book.cover_key) {
+  const coverSrc = book.cover_key ? fileUrl(book.cover_key) : getPdfThumbnailUrl(book.file_key);
+
+  if (coverSrc) {
     const img = document.createElement("img");
-    img.src = fileUrl(book.cover_key);
+    img.src = coverSrc;
     img.alt = `Cover of ${book.title}`;
     img.loading = "lazy";
+    img.onerror = () => {
+      // If backend proxy thumbnail fails, attempt direct Google Drive thumbnail before falling back
+      if (book.file_key?.startsWith("gdrive:") && !img.dataset.failedDirect) {
+        img.dataset.failedDirect = "true";
+        const fileId = book.file_key.slice(7).trim();
+        img.src = `https://drive.google.com/thumbnail?id=${encodeURIComponent(fileId)}&sz=w600`;
+        return;
+      }
+      wrap.replaceChildren(createEl("span", "book-cover-placeholder", "No cover"));
+    };
     wrap.appendChild(img);
-  } else if (book.file_key) {
-    const thumbUrl = getPdfThumbnailUrl(book.file_key);
-    if (thumbUrl) {
-      const img = document.createElement("img");
-      img.src = thumbUrl;
-      img.alt = `Cover of ${book.title} (auto-generated)`;
-      img.loading = "lazy";
-      wrap.appendChild(img);
-    } else {
-      wrap.appendChild(createEl("span", "book-cover-placeholder", "No cover"));
-    }
   } else {
     wrap.appendChild(createEl("span", "book-cover-placeholder", "No cover"));
   }
@@ -117,6 +140,9 @@ function renderBookCard(book) {
   const card = createEl("article", "book-card");
   card.setAttribute("role", "listitem");
   card.dataset.id = book.id;
+  if (book.has_passcode) {
+    card.classList.add("has-passcode");
+  }
 
   card.appendChild(renderCover(book));
 
@@ -126,12 +152,21 @@ function renderBookCard(book) {
     createEl("p", "book-meta", `${book.author}${book.year ? ` · ${book.year}` : ""}`)
   );
 
+  const badgesWrap = createEl("div", "book-badges");
   if (book.category_id) {
     const cat = allCategories.find((c) => c.id === book.category_id);
     if (cat) {
-      const badge = createEl("span", "book-category-badge", cat.name);
-      body.appendChild(badge);
+      badgesWrap.appendChild(createEl("span", "book-category-badge", cat.name));
     }
+  }
+  if (book.storage_source === "gdrive") {
+    badgesWrap.appendChild(createEl("span", "book-storage-badge", "Google Drive"));
+  }
+  if (book.visibility === "private") {
+    badgesWrap.appendChild(createEl("span", "book-visibility-badge", "Private"));
+  }
+  if (badgesWrap.children.length > 0) {
+    body.appendChild(badgesWrap);
   }
 
   const actions = createEl("div", "book-actions");
@@ -160,13 +195,28 @@ function renderBookCard(book) {
 
 function renderBooks(books, total) {
   bookList.replaceChildren();
+  const currentPin = getUserPin();
   if (books.length === 0) {
-    bookList.appendChild(createEl("p", "empty-state", "No books found."));
+    if (currentPin) {
+      bookList.appendChild(
+        createEl(
+          "p",
+          "empty-state",
+          "No books found for this passcode. Check your passcode or add a book using this passcode below."
+        )
+      );
+    } else {
+      bookList.appendChild(createEl("p", "empty-state", "No books found."));
+    }
   } else {
     books.forEach((book) => bookList.appendChild(renderBookCard(book)));
   }
   const showing = books.length;
-  bookCount.textContent = `Page ${currentPage} of ${totalPages} (${total} total, ${showing} shown)`;
+  if (currentPin) {
+    bookCount.textContent = `Private collection: ${total} book${total === 1 ? "" : "s"} found (passcode active)`;
+  } else {
+    bookCount.textContent = `Page ${currentPage} of ${totalPages} (${total} total, ${showing} shown)`;
+  }
   pageLabel.textContent = `Page ${currentPage}`;
   prevPageBtn.disabled = currentPage <= 1;
   nextPageBtn.disabled = currentPage >= totalPages;
@@ -406,13 +456,12 @@ bookList.addEventListener("click", async (e) => {
     return;
   }
 
-  if (!getApiKey()) {
-    setStatus("Enter your admin API key to manage books.", "error");
-    apiKeyInput.focus();
-    return;
-  }
-
   if (btn.dataset.action === "edit") {
+    if (!getApiKey()) {
+      setStatus("Enter your admin API key to edit books.", "error");
+      apiKeyInput.focus();
+      return;
+    }
     openEditModal(getCurrentBook(id));
     return;
   }
@@ -420,11 +469,27 @@ bookList.addEventListener("click", async (e) => {
   if (btn.dataset.action === "delete") {
     const book = getCurrentBook(id);
     const label = book ? `"${book.title}"` : "this book";
+    const hasAdmin = Boolean(getApiKey());
+    let pin = getUserPin();
+
+    if (!hasAdmin) {
+      if (book?.has_passcode) {
+        if (!pin) {
+          pin = prompt(`Enter the passcode you set for ${label} to delete it:`) || "";
+          if (!pin) return;
+        }
+      } else {
+        setStatus("Enter your admin API key to delete library books.", "error");
+        apiKeyInput.focus();
+        return;
+      }
+    }
+
     if (!confirm(`Delete ${label}? This cannot be undone.`)) return;
 
     setStatus("Deleting…");
     try {
-      await deleteBook(id);
+      await deleteBook(id, pin);
       setStatus("Book deleted.", "success");
       await loadBooks();
     } catch (err) {
@@ -436,9 +501,12 @@ bookList.addEventListener("click", async (e) => {
 addForm.addEventListener("submit", async (e) => {
   e.preventDefault();
 
-  if (!getApiKey()) {
-    setStatus("Enter your admin API key to add books.", "error");
-    apiKeyInput.focus();
+  const isGdrive = storageSourceSelect?.value === "gdrive";
+  const hasAdmin = Boolean(getApiKey());
+
+  if (!isGdrive && !hasAdmin) {
+    setStatus("Enter your admin API key to upload directly to Cloudinary, or choose Google Drive storage.", "error");
+    if (apiKeyInput) apiKeyInput.focus();
     return;
   }
 
@@ -447,8 +515,46 @@ addForm.addEventListener("submit", async (e) => {
   const yearVal = addForm.year.value;
   const year = yearVal ? parseInt(yearVal, 10) : null;
   const category_id = addForm.category_id.value;
-  const coverFile = addForm.cover.files[0];
-  const pdfFile = addForm.pdf.files[0];
+
+  if (isGdrive) {
+    const gdrive_url = addForm.gdrive_url?.value?.trim();
+    const visibility = addForm.visibility?.value || "public";
+    const passcode = addForm.passcode?.value?.trim();
+
+    if (!gdrive_url) {
+      setStatus("Google Drive link is required.", "error");
+      addForm.gdrive_url?.focus();
+      return;
+    }
+
+    if (!hasAdmin && (!passcode || passcode.length < 4)) {
+      setStatus("Please choose a passcode of at least 4 characters.", "error");
+      addForm.passcode?.focus();
+      return;
+    }
+
+    setStatus("Adding book from Google Drive…");
+    try {
+      await createBook({ title, author, year, category_id, gdrive_url, visibility, passcode });
+      if (passcode) {
+        setUserPin(passcode);
+        if (collectionPinInput) collectionPinInput.value = passcode;
+      }
+      addForm.reset();
+      if (storageSourceSelect) storageSourceSelect.value = "gdrive";
+      updateStorageFieldsUI();
+      setStatus("Book added successfully from Google Drive!", "success");
+      currentPage = 1;
+      hideAddBookSection();
+      await loadBooks();
+    } catch (err) {
+      setStatus(err.message, "error");
+    }
+    return;
+  }
+
+  const coverFile = addForm.cover?.files?.[0];
+  const pdfFile = addForm.pdf?.files?.[0];
 
   setStatus("Adding book…");
   try {
@@ -463,11 +569,122 @@ addForm.addEventListener("submit", async (e) => {
     addForm.reset();
     setStatus("Book added.", "success");
     currentPage = 1;
+    hideAddBookSection();
     await loadBooks();
   } catch (err) {
     setStatus(err.message, "error");
   }
 });
+
+function showAddBookSection() {
+  if (!addBookSection) return;
+  addBookSection.style.display = "";
+  if (toggleAddBtn) {
+    toggleAddBtn.setAttribute("aria-expanded", "true");
+  }
+  const firstInput = addBookSection.querySelector("input:not([type='hidden'])");
+  if (firstInput) firstInput.focus();
+}
+
+function hideAddBookSection() {
+  if (!addBookSection) return;
+  addBookSection.style.display = "none";
+  if (toggleAddBtn) {
+    toggleAddBtn.setAttribute("aria-expanded", "false");
+  }
+}
+
+function toggleAddBookSection() {
+  if (!addBookSection) return;
+  const isHidden = addBookSection.style.display === "none" || getComputedStyle(addBookSection).display === "none";
+  if (isHidden) {
+    showAddBookSection();
+  } else {
+    hideAddBookSection();
+  }
+}
+
+if (toggleAddBtn) {
+  toggleAddBtn.addEventListener("click", toggleAddBookSection);
+}
+
+if (closeAddBtn) {
+  closeAddBtn.addEventListener("click", hideAddBookSection);
+}
+
+if (cancelAddBtn) {
+  cancelAddBtn.addEventListener("click", hideAddBookSection);
+}
+
+function openAddBookFromLanding() {
+  showAddBookSection();
+  if (addBookSection) {
+    addBookSection.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+}
+
+if (navAddBtn) {
+  navAddBtn.addEventListener("click", openAddBookFromLanding);
+}
+
+if (heroAddBtn) {
+  heroAddBtn.addEventListener("click", () => {
+    openAddBookFromLanding();
+    if (storageSourceSelect) {
+      storageSourceSelect.value = "gdrive";
+      updateStorageFieldsUI();
+    }
+  });
+}
+
+if (navVaultLink) {
+  navVaultLink.addEventListener("click", (e) => {
+    e.preventDefault();
+    if (collectionPinInput) {
+      collectionPinInput.scrollIntoView({ behavior: "smooth", block: "center" });
+      setTimeout(() => {
+        collectionPinInput.focus();
+        collectionPinInput.classList.add("pin-highlight");
+        setTimeout(() => collectionPinInput.classList.remove("pin-highlight"), 1500);
+      }, 400);
+    }
+  });
+}
+
+const showcaseResponses = {
+  summary: {
+    tag: "Page 42 Analysis",
+    text: "“Here are the 3 core insights from this chapter: First, active inquiry deepens retention. Second, contextual bookmarks allow instant revision. Third, text-to-speech reinforces comprehension.”",
+  },
+  quiz: {
+    tag: "Knowledge Check",
+    text: "“Quick self-test from Page 42: What is the primary benefit of contextual bookmarks according to the author? A) Battery life, B) Instant revision, C) Faster rendering.”",
+  },
+  explain: {
+    tag: "Plain English",
+    text: "“In simple terms: Reading passively only stores short-term memory. Pairing Gemini AI summaries with auditory TTS playback turns complex textbooks into effortless mastery.”",
+  },
+};
+
+if (promptChips.length > 0 && showcaseAiText) {
+  promptChips.forEach((chip) => {
+    chip.addEventListener("click", () => {
+      const type = chip.dataset.prompt;
+      const resp = showcaseResponses[type];
+      if (!resp) return;
+
+      promptChips.forEach((c) => c.classList.remove("active"));
+      chip.classList.add("active");
+
+      showcaseAiText.classList.add("fade-out");
+      setTimeout(() => {
+        if (showcaseAiTag) showcaseAiTag.textContent = resp.tag;
+        showcaseAiText.textContent = resp.text;
+        showcaseAiText.classList.remove("fade-out");
+      }, 200);
+    });
+  });
+}
 
 searchInput.addEventListener("input", async () => {
   const query = searchInput.value.trim();
@@ -492,16 +709,53 @@ searchInput.addEventListener("input", async () => {
 
 let authDebounce = null;
 
+function toggleAdminOptions(isAdmin) {
+  const adminOptions = document.querySelectorAll(".admin-only-option");
+  adminOptions.forEach((opt) => {
+    opt.style.display = isAdmin ? "" : "none";
+  });
+  if (!isAdmin && storageSourceSelect && storageSourceSelect.value === "cloudinary") {
+    storageSourceSelect.value = "gdrive";
+    updateStorageFieldsUI();
+  }
+}
+
+function updateStorageFieldsUI() {
+  const isGdrive = storageSourceSelect?.value === "gdrive";
+  if (gdriveFields) gdriveFields.style.display = isGdrive ? "" : "none";
+  if (cloudinaryFields) cloudinaryFields.style.display = isGdrive ? "none" : "";
+}
+
+if (storageSourceSelect) {
+  storageSourceSelect.addEventListener("change", updateStorageFieldsUI);
+}
+
+if (collectionPinInput) {
+  collectionPinInput.value = getUserPin();
+  let pinDebounce = null;
+  collectionPinInput.addEventListener("input", () => {
+    clearTimeout(pinDebounce);
+    pinDebounce = setTimeout(() => {
+      const pin = collectionPinInput.value.trim();
+      setUserPin(pin);
+      currentPage = 1;
+      loadBooks();
+    }, 400);
+  });
+}
+
 async function updateAdminUI() {
   const key = getApiKey();
   if (!key) {
     document.body.classList.remove("is-admin");
     setApiKeyError("");
+    toggleAdminOptions(false);
     return;
   }
   const isValid = await validateApiKey(key);
   document.body.classList.toggle("is-admin", isValid);
   setApiKeyError(isValid ? "" : "Invalid API key.");
+  toggleAdminOptions(isValid);
 }
 
 apiKeyInput.addEventListener("input", () => {
@@ -511,6 +765,7 @@ apiKeyInput.addEventListener("input", () => {
     clearTimeout(authDebounce);
     document.body.classList.remove("is-admin");
     setApiKeyError("");
+    toggleAdminOptions(false);
   } else {
     clearTimeout(authDebounce);
     authDebounce = setTimeout(updateAdminUI, 300);

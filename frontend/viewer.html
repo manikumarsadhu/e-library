@@ -1081,6 +1081,83 @@
       color: #fca5a5;
     }
 
+    .chat-msg-content {
+      word-break: break-word;
+    }
+
+    .chat-msg-actions {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      margin-top: 0.35rem;
+      padding-top: 0.25rem;
+    }
+
+    .chat-message.ai .chat-msg-actions {
+      border-top: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .chat-message.user .chat-msg-actions {
+      border-top: 1px solid rgba(255, 255, 255, 0.2);
+    }
+
+    .chat-copy-btn {
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      color: var(--text-muted);
+      border-radius: 4px;
+      padding: 0.2rem 0.45rem;
+      font-size: 0.72rem;
+      font-weight: 500;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.3rem;
+      transition: all 0.15s ease;
+      line-height: 1;
+      font-family: inherit;
+    }
+
+    .chat-message.user .chat-copy-btn {
+      background: rgba(255, 255, 255, 0.18);
+      border-color: rgba(255, 255, 255, 0.3);
+      color: rgba(255, 255, 255, 0.95);
+    }
+
+    .chat-copy-btn:hover {
+      color: var(--text-color);
+      background: rgba(255, 255, 255, 0.15);
+      border-color: rgba(255, 255, 255, 0.25);
+    }
+
+    .chat-copy-btn.copied {
+      color: #10b981 !important;
+      border-color: #10b981 !important;
+      background: rgba(16, 185, 129, 0.15) !important;
+    }
+
+    body.theme-light .chat-copy-btn {
+      background: rgba(0, 0, 0, 0.04);
+      border-color: rgba(0, 0, 0, 0.1);
+      color: var(--text-muted);
+    }
+
+    body.theme-light .chat-copy-btn:hover {
+      background: rgba(0, 0, 0, 0.08);
+      color: var(--text-color);
+    }
+
+    body.theme-sepia .chat-copy-btn {
+      background: rgba(92, 64, 51, 0.06);
+      border-color: rgba(92, 64, 51, 0.18);
+      color: var(--text-muted);
+    }
+
+    body.theme-sepia .chat-copy-btn:hover {
+      background: rgba(92, 64, 51, 0.12);
+      color: var(--text-color);
+    }
+
     .suggested-prompts {
       display: flex;
       flex-wrap: wrap;
@@ -1251,7 +1328,8 @@
     body.fullscreen-mode header .controls > *:not(#fullscreen-toggle) {
       display: none !important;
     }
-    body.fullscreen-mode #ai-sidebar {
+    body.fullscreen-mode #ai-sidebar,
+    body.fullscreen-mode #toc-sidebar {
       display: none !important;
     }
     body.fullscreen-mode #sidebar-backdrop {
@@ -1259,6 +1337,421 @@
     }
     body.fullscreen-mode #viewer-container {
       padding-top: 1rem !important;
+    }
+
+    /* Page Navigation & Jump Input */
+    .page-nav-group {
+      display: flex;
+      align-items: center;
+      gap: 0.25rem;
+      background: rgba(0, 0, 0, 0.18);
+      padding: 0.125rem 0.25rem;
+      border-radius: 6px;
+      border: 1px solid var(--border-color);
+    }
+
+    .page-jump-container {
+      display: flex;
+      align-items: center;
+      gap: 0.35rem;
+      padding: 0 0.3rem;
+    }
+
+    .page-num-input {
+      width: 46px;
+      height: 26px;
+      background: var(--bg-color);
+      border: 1px solid var(--border-color);
+      color: var(--text-color);
+      border-radius: 4px;
+      text-align: center;
+      font-size: 0.8125rem;
+      font-weight: 600;
+      padding: 0 0.2rem;
+      outline: none;
+      transition: border-color 0.15s, box-shadow 0.15s;
+      -moz-appearance: textfield;
+      box-sizing: border-box;
+    }
+
+    .page-num-input:focus {
+      border-color: var(--primary-color);
+      box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.3);
+    }
+
+    .page-num-input::-webkit-inner-spin-button,
+    .page-num-input::-webkit-outer-spin-button {
+      -webkit-appearance: none;
+      margin: 0;
+    }
+
+    .page-total-label {
+      font-size: 0.8125rem;
+      color: var(--text-muted);
+      font-weight: 500;
+      white-space: nowrap;
+      user-select: none;
+    }
+
+    /* Page View Dropdown */
+    .page-view-wrapper {
+      position: relative;
+    }
+
+    .page-view-dropdown {
+      position: absolute;
+      top: calc(100% + 8px);
+      left: 50%;
+      transform: translateX(-50%);
+      background: var(--surface-color);
+      border: 1px solid var(--border-color);
+      border-radius: 10px;
+      padding: 0.85rem 1rem;
+      box-shadow: 0 15px 30px -5px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(255, 255, 255, 0.05);
+      z-index: 1000;
+      min-width: 250px;
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+      animation: fadeInDown 0.16s ease-out;
+    }
+
+    .page-view-dropdown.hidden {
+      display: none !important;
+    }
+
+    @keyframes fadeInDown {
+      from { opacity: 0; transform: translate(-50%, -6px); }
+      to { opacity: 1; transform: translate(-50%, 0); }
+    }
+
+    .page-view-title {
+      font-size: 0.875rem;
+      font-weight: 600;
+      color: var(--text-color);
+    }
+
+    .page-view-modes {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.6rem;
+    }
+
+    .page-view-mode-card {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 0.45rem;
+      padding: 0.75rem 0.5rem;
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.03);
+      border: 1.5px solid var(--border-color);
+      color: var(--text-color);
+      cursor: pointer;
+      transition: all 0.15s ease;
+      outline: none;
+    }
+
+    .page-view-mode-card:hover {
+      background: rgba(255, 255, 255, 0.08);
+      border-color: var(--text-muted);
+    }
+
+    .page-view-mode-card.active {
+      border-color: var(--primary-color);
+      background: rgba(59, 130, 246, 0.12);
+      color: var(--primary-color);
+    }
+
+    .page-view-mode-card.active .page-view-mode-preview {
+      color: var(--primary-color);
+    }
+
+    .page-view-mode-preview {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--text-muted);
+      height: 30px;
+    }
+
+    .page-view-mode-name {
+      font-size: 0.8rem;
+      font-weight: 500;
+    }
+
+    .page-view-divider {
+      height: 1px;
+      background: var(--border-color);
+    }
+
+    .cover-toggle-label {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.75rem;
+      font-size: 0.8125rem;
+      color: var(--text-color);
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .switch-toggle {
+      position: relative;
+      display: inline-block;
+      width: 36px;
+      height: 20px;
+      flex-shrink: 0;
+    }
+
+    .switch-toggle input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+
+    .slider-toggle {
+      position: absolute;
+      cursor: pointer;
+      inset: 0;
+      background-color: var(--border-color);
+      transition: 0.2s;
+      border-radius: 20px;
+    }
+
+    .slider-toggle:before {
+      position: absolute;
+      content: "";
+      height: 14px;
+      width: 14px;
+      left: 3px;
+      bottom: 3px;
+      background-color: white;
+      transition: 0.2s;
+      border-radius: 50%;
+    }
+
+    .switch-toggle input:checked + .slider-toggle {
+      background-color: var(--primary-color);
+    }
+
+    .switch-toggle input:checked + .slider-toggle:before {
+      transform: translateX(16px);
+    }
+
+    /* Two Page Spread View Layout */
+    .two-page-view {
+      gap: 2rem !important;
+    }
+
+    .page-spread {
+      display: flex;
+      flex-direction: row;
+      justify-content: center;
+      align-items: flex-start;
+      gap: 16px;
+      width: 100%;
+      max-width: 100%;
+      box-sizing: border-box;
+      flex-shrink: 0;
+    }
+
+    .page-spread.spread-cover {
+      justify-content: center;
+    }
+
+    .two-page-view .page-container {
+      margin: 0 !important;
+      align-self: flex-start !important;
+    }
+
+    .two-page-view .page-left {
+      box-shadow: -4px 6px 16px -2px rgba(0, 0, 0, 0.4), 2px 0 4px rgba(0, 0, 0, 0.15);
+    }
+
+    .two-page-view .page-right {
+      box-shadow: 4px 6px 16px -2px rgba(0, 0, 0, 0.4), -2px 0 4px rgba(0, 0, 0, 0.15);
+    }
+
+    @media (max-width: 768px) {
+      .page-spread {
+        flex-direction: column;
+        align-items: center;
+        gap: 1.5rem;
+      }
+    }
+
+    /* Table of Contents (Left Sidebar) */
+    #toc-sidebar {
+      width: 270px;
+      min-width: 230px;
+      max-width: 360px;
+      background-color: var(--surface-color);
+      border-right: 1px solid var(--border-color);
+      display: flex;
+      flex-direction: column;
+      position: relative;
+      transition: transform 0.25s ease, margin-left 0.25s ease, width 0.25s ease;
+      z-index: 50;
+      box-shadow: 4px 0 15px -3px rgba(0, 0, 0, 0.3);
+      overflow: hidden;
+    }
+
+    #toc-sidebar.collapsed {
+      display: none !important;
+      width: 0 !important;
+      margin-left: 0 !important;
+    }
+
+    .toc-header {
+      padding: 0.85rem 1rem;
+      border-bottom: 1px solid var(--border-color);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: rgba(0, 0, 0, 0.1);
+      flex-shrink: 0;
+    }
+
+    .toc-title {
+      margin: 0;
+      font-size: 0.95rem;
+      font-weight: 600;
+      color: var(--text-color);
+    }
+
+    .toc-subtabs {
+      display: flex;
+      border-bottom: 1px solid var(--border-color);
+      background: rgba(0, 0, 0, 0.15);
+      flex-shrink: 0;
+    }
+
+    .toc-subtab-btn {
+      flex: 1;
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      padding: 0.55rem;
+      font-size: 0.8125rem;
+      font-weight: 600;
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      transition: all 0.15s ease;
+      outline: none;
+    }
+
+    .toc-subtab-btn:hover {
+      color: var(--text-color);
+      background-color: rgba(255, 255, 255, 0.03);
+    }
+
+    .toc-subtab-btn.active {
+      color: var(--primary-color);
+      border-bottom-color: var(--primary-color);
+      background-color: rgba(255, 255, 255, 0.05);
+    }
+
+    .toc-content-pane {
+      flex: 1;
+      overflow-y: auto;
+      scrollbar-width: thin;
+      scrollbar-color: var(--border-color) transparent;
+    }
+
+    .toc-content-pane.hidden {
+      display: none !important;
+    }
+
+    /* Thumbnails list */
+    .toc-thumbnails-grid {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 1.25rem;
+      padding: 1.25rem 0.75rem;
+    }
+
+    .toc-thumb-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.4rem;
+      cursor: pointer;
+      padding: 0.4rem;
+      border-radius: 8px;
+      transition: transform 0.15s ease, background 0.15s ease;
+      width: 100%;
+      max-width: 150px;
+      box-sizing: border-box;
+    }
+
+    .toc-thumb-item:hover {
+      background: rgba(255, 255, 255, 0.06);
+      transform: translateY(-2px);
+    }
+
+    .toc-thumb-canvas-wrap {
+      position: relative;
+      background: white;
+      border-radius: 4px;
+      overflow: hidden;
+      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.35);
+      border: 1px solid var(--border-color);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 120px;
+      min-width: 90px;
+      transition: outline 0.15s ease, box-shadow 0.15s ease;
+    }
+
+    .toc-thumb-item.active .toc-thumb-canvas-wrap {
+      outline: 2.5px solid var(--primary-color);
+      box-shadow: 0 0 12px rgba(59, 130, 246, 0.55);
+    }
+
+    .toc-thumb-canvas {
+      display: block;
+      filter: none !important;
+    }
+
+    body.theme-dark .toc-thumb-canvas,
+    body.theme-oled .toc-thumb-canvas,
+    body.theme-sepia .toc-thumb-canvas {
+      filter: none !important;
+    }
+
+    .toc-thumb-num {
+      font-size: 0.78rem;
+      font-weight: 500;
+      color: var(--text-muted);
+    }
+
+    .toc-thumb-item.active .toc-thumb-num {
+      color: var(--primary-color);
+      font-weight: 700;
+    }
+
+    .toc-thumb-spinner {
+      width: 22px;
+      height: 22px;
+      border: 2px solid var(--border-color);
+      border-top-color: var(--primary-color);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+
+    @media (max-width: 768px) {
+      #toc-sidebar {
+        position: absolute;
+        left: 0;
+        top: 0;
+        bottom: 0;
+        width: 260px;
+        z-index: 99;
+      }
     }
   </style>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js"
@@ -1276,6 +1769,13 @@
             <polyline points="12 19 5 12 12 5"></polyline>
           </svg>
         </a>
+        <button id="toc-toggle-btn" class="btn" title="Table of Contents" aria-label="Table of Contents">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="3" y1="6" x2="21" y2="6"></line>
+            <line x1="3" y1="12" x2="15" y2="12"></line>
+            <line x1="3" y1="18" x2="18" y2="18"></line>
+          </svg>
+        </button>
         <div class="doc-meta">
           <div class="doc-title" id="doc-title">Loading...</div>
           <div class="doc-pages" id="doc-pages">Page: - / -</div>
@@ -1294,18 +1794,24 @@
       </button>
     </div>
     <div class="controls" id="header-controls">
-      <button id="prev-page-btn" class="btn" title="Previous Page" aria-label="Previous Page">
-        <span class="visually-hidden">Previous Page</span>
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-          <polyline points="18 15 12 9 6 15"></polyline>
-        </svg>
-      </button>
-      <button id="next-page-btn" class="btn" title="Next Page" aria-label="Next Page">
-        <span class="visually-hidden">Next Page</span>
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-          <polyline points="6 9 12 15 18 9"></polyline>
-        </svg>
-      </button>
+      <div class="page-nav-group">
+        <button id="prev-page-btn" class="btn" title="Previous Page" aria-label="Previous Page">
+          <span class="visually-hidden">Previous Page</span>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="15 18 9 12 15 6"></polyline>
+          </svg>
+        </button>
+        <div class="page-jump-container">
+          <input type="number" id="page-num-input" class="page-num-input" min="1" value="1" aria-label="Page number" />
+          <span class="page-total-label">of <span id="total-pages-count">-</span></span>
+        </div>
+        <button id="next-page-btn" class="btn" title="Next Page" aria-label="Next Page">
+          <span class="visually-hidden">Next Page</span>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="9 18 15 12 9 6"></polyline>
+          </svg>
+        </button>
+      </div>
       <button id="zoom-out" class="btn" title="Zoom Out" aria-label="Zoom out">
         <span class="visually-hidden">Zoom out</span>
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
@@ -1327,6 +1833,48 @@
           <path d="M20 12l-3-3M20 12l-3 3" />
         </svg>
       </button>
+      <div class="page-view-wrapper">
+        <button id="page-view-btn" class="btn" title="Page view" aria-label="Page view">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M2 4v16a2 2 0 0 0 2 2h6V4H4a2 2 0 0 0-2 0z"></path>
+            <path d="M22 4v16a2 2 0 0 1-2 2h-6V4h6a2 2 0 0 1 2 0z"></path>
+          </svg>
+        </button>
+        <div id="page-view-dropdown" class="page-view-dropdown hidden">
+          <div class="page-view-title">Page view</div>
+          <div class="page-view-modes">
+            <button type="button" id="view-mode-single" class="page-view-mode-card active" title="Single page">
+              <div class="page-view-mode-preview">
+                <svg width="22" height="26" viewBox="0 0 24 28" fill="none" stroke="currentColor" stroke-width="2">
+                  <rect x="4" y="2" width="16" height="24" rx="2"></rect>
+                  <line x1="8" y1="8" x2="16" y2="8"></line>
+                  <line x1="8" y1="13" x2="16" y2="13"></line>
+                </svg>
+              </div>
+              <span class="page-view-mode-name">Single page</span>
+            </button>
+            <button type="button" id="view-mode-two" class="page-view-mode-card" title="Two page">
+              <div class="page-view-mode-preview">
+                <svg width="30" height="26" viewBox="0 0 34 28" fill="none" stroke="currentColor" stroke-width="2">
+                  <rect x="2" y="2" width="14" height="24" rx="1.5"></rect>
+                  <rect x="18" y="2" width="14" height="24" rx="1.5"></rect>
+                  <line x1="5" y1="8" x2="13" y2="8"></line>
+                  <line x1="21" y1="8" x2="29" y2="8"></line>
+                </svg>
+              </div>
+              <span class="page-view-mode-name">Two page</span>
+            </button>
+          </div>
+          <div class="page-view-divider"></div>
+          <label class="cover-toggle-label">
+            <span>Show cover page separately</span>
+            <span class="switch-toggle">
+              <input type="checkbox" id="cover-page-checkbox" checked />
+              <span class="slider-toggle"></span>
+            </span>
+          </label>
+        </div>
+      </div>
       <select id="theme-select" class="btn" title="Change Theme" aria-label="Change theme">
         <option value="dark">🌙 Dark</option>
         <option value="oled">🖤 OLED</option>
@@ -1396,6 +1944,26 @@
   </header>
 
   <div id="main-layout">
+    <!-- Table of Contents Sidebar -->
+    <aside id="toc-sidebar" class="toc-sidebar collapsed" aria-label="Table of Contents">
+      <div class="toc-header">
+        <h3 class="toc-title">Table of Contents</h3>
+        <button id="toc-close-btn" class="close-btn" title="Close" aria-label="Close Table of Contents">&times;</button>
+      </div>
+      <div class="toc-subtabs">
+        <button id="toc-tab-pages" class="toc-subtab-btn active" type="button">Pages</button>
+        <button id="toc-tab-outline" class="toc-subtab-btn" type="button">Chapters</button>
+      </div>
+      <div id="toc-thumbnails-container" class="toc-content-pane">
+        <div class="toc-thumbnails-grid" id="toc-thumbnails-grid"></div>
+      </div>
+      <div id="toc-outline-container" class="toc-content-pane hidden">
+        <div id="toc-chapters-list" class="chapters-tree">
+          <div class="chapters-empty">Analyzing document chapters...</div>
+        </div>
+      </div>
+    </aside>
+
     <div id="viewer-container">
       <div id="loading">
         <div class="spinner"></div>

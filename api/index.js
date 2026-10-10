@@ -23,6 +23,11 @@ import {
   listCategories,
   updateCategory,
 } from "./lib/categories.js";
+import {
+  fetchGoogleDriveFile,
+  fetchGoogleDriveThumbnail,
+  parseGoogleDriveKey,
+} from "./lib/gdrive.js";
 
 function parsePositiveInt(value, fallback) {
   const num = Number.parseInt(value ?? "", 10);
@@ -35,12 +40,13 @@ function getClientIp(req) {
   return req.socket?.remoteAddress || "unknown";
 }
 
-function applyRateLimit(req, res, key) {
-  const perMin = parsePositiveInt(process.env.RATE_LIMIT_PER_MIN, 0);
-  if (!perMin) return false;
+function applyRateLimit(req, res, key, defaultLimit = 120) {
+  const envVal = parsePositiveInt(process.env.RATE_LIMIT_PER_MIN, 0);
+  const limit = envVal || (process.env.NODE_ENV === "production" ? defaultLimit : 0);
+  if (!limit) return false;
   const result = checkRateLimit({
     key: `${getClientIp(req)}:${key}`,
-    limit: perMin,
+    limit,
     windowMs: 60_000,
   });
   if (result.allowed) return false;
@@ -73,7 +79,10 @@ export default async function handler(req, res) {
       const page = parsePositiveInt(parsedUrl.searchParams.get("page"), 1);
       const limit = Math.min(parsePositiveInt(parsedUrl.searchParams.get("limit"), 20), 100);
       const category_id = parsedUrl.searchParams.get("category_id") || "";
-      const result = await listBooks({ query: q, page, limit, category_id });
+      const pin = parsedUrl.searchParams.get("pin") || req.headers["x-access-pin"] || "";
+      const scope = parsedUrl.searchParams.get("scope") || "";
+      const isAdmin = requireAuth(req);
+      const result = await listBooks({ query: q, page, limit, category_id, passcode: pin, scope, isAdmin });
       return res.status(200).json(result);
     }
 
@@ -100,10 +109,92 @@ export default async function handler(req, res) {
       return res.status(200).json({ book });
     }
 
+    // Direct Google Drive file streaming proxy
+    if (method === "GET" && parts[0] === "api" && parts[1] === "drive" && parts.length === 3) {
+      if (applyRateLimit(req, res, "files", 60)) return;
+      const fileId = parts[2];
+      try {
+        const driveRes = await fetchGoogleDriveFile(fileId);
+        if (res.destroyed || res.writableEnded) return;
+        res.setHeader("Content-Type", "application/pdf");
+        res.setHeader("Access-Control-Allow-Origin", "*");
+        res.setHeader("Cache-Control", "public, max-age=3600");
+        const arrayBuffer = await driveRes.arrayBuffer();
+        if (res.destroyed || res.writableEnded) return;
+        const buffer = Buffer.from(arrayBuffer);
+        res.setHeader("Content-Length", buffer.length);
+        res.statusCode = 200;
+        try {
+          res.end(buffer);
+        } catch {
+          // Client aborted connection
+        }
+        return;
+      } catch (driveErr) {
+        if (res.destroyed || res.writableEnded) return;
+        return res.status(502).json({ error: driveErr.message });
+      }
+    }
+
+    // Google Drive file thumbnail proxy (first page of document as default cover)
+    if (method === "GET" && parts[0] === "api" && parts[1] === "drive" && parts.length === 4 && parts[3] === "thumbnail") {
+      if (applyRateLimit(req, res, "thumbnails", 100)) return;
+      const fileId = parts[2];
+      try {
+        const thumbRes = await fetchGoogleDriveThumbnail(fileId);
+        if (res.destroyed || res.writableEnded) return;
+        const contentType = thumbRes.headers.get("content-type") || "image/png";
+        res.setHeader("Content-Type", contentType);
+        res.setHeader("Access-Control-Allow-Origin", "*");
+        res.setHeader("Cache-Control", "public, max-age=86400");
+        const arrayBuffer = await thumbRes.arrayBuffer();
+        if (res.destroyed || res.writableEnded) return;
+        const buffer = Buffer.from(arrayBuffer);
+        res.setHeader("Content-Length", buffer.length);
+        res.statusCode = 200;
+        try {
+          res.end(buffer);
+        } catch {
+          // Client aborted connection
+        }
+        return;
+      } catch (thumbErr) {
+        if (res.destroyed || res.writableEnded) return;
+        return res.status(502).json({ error: thumbErr.message });
+      }
+    }
+
     if (method === "GET" && parts[0] === "api" && parts[1] === "files" && parts.length >= 3) {
-      if (applyRateLimit(req, res, "files")) return;
+      if (applyRateLimit(req, res, "files", 60)) return;
       const key = parts.slice(2).join("/");
       const decodedKey = decodeURIComponent(key);
+
+      if (decodedKey.startsWith("gdrive:")) {
+        const parsedGdrive = parseGoogleDriveKey(decodedKey);
+        if (!parsedGdrive) return res.status(404).json({ error: "Invalid Google Drive key" });
+        try {
+          const driveRes = await fetchGoogleDriveFile(parsedGdrive.fileId);
+          if (res.destroyed || res.writableEnded) return;
+          res.setHeader("Content-Type", "application/pdf");
+          res.setHeader("Access-Control-Allow-Origin", "*");
+          res.setHeader("Cache-Control", "public, max-age=3600");
+          const arrayBuffer = await driveRes.arrayBuffer();
+          if (res.destroyed || res.writableEnded) return;
+          const buffer = Buffer.from(arrayBuffer);
+          res.setHeader("Content-Length", buffer.length);
+          res.statusCode = 200;
+          try {
+            res.end(buffer);
+          } catch {
+            // Client aborted connection
+          }
+          return;
+        } catch (driveErr) {
+          if (res.destroyed || res.writableEnded) return;
+          return res.status(502).json({ error: driveErr.message });
+        }
+      }
+
       const parsed = parseCloudinaryKey(decodedKey);
       if (!parsed) {
         return res.status(404).json({ error: "File not found or legacy storage" });
@@ -112,13 +203,13 @@ export default async function handler(req, res) {
     }
 
     if (method === "POST" && parts[0] === "api" && parts[1] === "ai" && parts[2] === "chat" && parts.length === 3) {
-      if (applyRateLimit(req, res, "ai-chat")) return;
+      if (applyRateLimit(req, res, "ai-chat", 20)) return;
       return await handleChatRoute(req, res);
     }
 
     // POST /api/ai/extract-outline — AI-powered chapter detection
     if (method === "POST" && parts[0] === "api" && parts[1] === "ai" && parts[2] === "extract-outline" && parts.length === 3) {
-      if (applyRateLimit(req, res, "ai-chat")) return;
+      if (applyRateLimit(req, res, "ai-outline", 10)) return;
       return await handleExtractOutlineRoute(req, res);
     }
 
@@ -138,11 +229,31 @@ export default async function handler(req, res) {
       const book = await getBook(parts[2]);
       if (!book) return res.status(404).json({ error: "Book not found" });
       await setBookOutline(parts[2], outline);
+      return res.status(200).json({ ok: true, outline });
     }
 
     if (method === "GET" && parts[0] === "api" && parts[1] === "categories" && parts.length === 2) {
       const categories = await listCategories();
       return res.status(200).json({ categories });
+    }
+
+    if (method === "POST" && parts[0] === "api" && parts[1] === "books" && parts.length === 2) {
+      const body = req.body || (await readJsonBody(req));
+      const isAdmin = requireAuth(req);
+      if (!isAdmin && !body?.gdrive_url) {
+        return res.status(401).json({ error: "Unauthorized: Admin API key or Google Drive link required" });
+      }
+      const book = await createBook(body, { isAdmin });
+      return res.status(201).json({ book });
+    }
+
+    if (method === "DELETE" && parts[0] === "api" && parts[1] === "books" && parts.length === 3) {
+      const body = req.body || (await readJsonBody(req).catch(() => ({})));
+      const pin = parsedUrl.searchParams.get("pin") || req.headers["x-access-pin"] || body?.passcode || "";
+      const isAdmin = requireAuth(req);
+      const deleted = await deleteBook(parts[2], { passcode: pin, isAdmin });
+      if (!deleted) return res.status(404).json({ error: "Book not found" });
+      return res.status(200).json({ ok: true });
     }
 
     const needsAuth = method === "POST" || method === "PATCH" || method === "DELETE";
@@ -170,23 +281,11 @@ export default async function handler(req, res) {
       return res.status(200).json({ ok: true });
     }
 
-    if (method === "POST" && parts[0] === "api" && parts[1] === "books" && parts.length === 2) {
-      const body = await readJsonBody(req);
-      const book = await createBook(body);
-      return res.status(201).json({ book });
-    }
-
     if (method === "PATCH" && parts[0] === "api" && parts[1] === "books" && parts.length === 3) {
       const body = await readJsonBody(req);
       const book = await updateBook(parts[2], body);
       if (!book) return res.status(404).json({ error: "Book not found" });
       return res.status(200).json({ book });
-    }
-
-    if (method === "DELETE" && parts[0] === "api" && parts[1] === "books" && parts.length === 3) {
-      const deleted = await deleteBook(parts[2]);
-      if (!deleted) return res.status(404).json({ error: "Book not found" });
-      return res.status(200).json({ ok: true });
     }
 
     if (
@@ -228,7 +327,12 @@ export default async function handler(req, res) {
       "file field is required",
       "Cover must be JPEG, PNG, WebP, or GIF",
       "File must be PDF or an image",
-      "Book not found"
+      "Book not found",
+      "Invalid Google Drive link. Please paste a valid Google Drive share link or file ID.",
+      "A passcode of at least 4 characters is required to upload your book.",
+      "Incorrect passcode for this book",
+      "Admin authorization required to delete this book",
+      "Google Drive file is private. Please set sharing permission to \"Anyone with the link can view\"."
     ];
     
     const isProduction = process.env.NODE_ENV === "production";
