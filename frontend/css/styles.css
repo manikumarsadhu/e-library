@@ -771,6 +771,7 @@ h1, h2, h3, h4, .brand-name {
 .add-btn-wrap {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 0.5rem;
 }
 
@@ -898,7 +899,12 @@ h1, h2, h3, h4, .brand-name {
   border: 1px solid rgba(59, 130, 246, 0.4);
 }
 
-body.is-admin .admin-badge {
+.admin-only-btn {
+  display: none;
+}
+
+body.is-admin .admin-badge,
+body.is-admin .admin-only-btn {
   display: inline-flex;
 }
 
