@@ -3,6 +3,13 @@ const buckets = new Map();
 export function checkRateLimit({ key, limit, windowMs }) {
   const now = Date.now();
   const windowStart = now - windowMs;
+  if (buckets.size > 1000) {
+    for (const [k, list] of buckets.entries()) {
+      const fresh = list.filter((ts) => ts > windowStart);
+      if (fresh.length === 0) buckets.delete(k);
+      else buckets.set(k, fresh);
+    }
+  }
   const entries = (buckets.get(key) || []).filter((ts) => ts > windowStart);
 
   if (entries.length >= limit) {

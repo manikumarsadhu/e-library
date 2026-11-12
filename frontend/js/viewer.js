@@ -1559,9 +1559,20 @@ async function extractOutlineWithAI() {
   }
 }
 
+function bookAccessHeaders(extra = {}) {
+  const h = { ...extra };
+  const apiKey = sessionStorage.getItem("elibrary_api_key");
+  const pin = sessionStorage.getItem("elibrary_user_pin");
+  if (apiKey) h.Authorization = `Bearer ${apiKey}`;
+  if (pin) h["x-access-pin"] = pin;
+  return h;
+}
+
 async function fetchCachedOutline(id) {
   try {
-    const resp = await fetch(`/api/books/${encodeURIComponent(id)}/outline`);
+    const resp = await fetch(`/api/books/${encodeURIComponent(id)}/outline`, {
+      headers: bookAccessHeaders(),
+    });
     if (!resp.ok) return null;
     const data = await resp.json();
     return data.outline || null;
@@ -1574,7 +1585,7 @@ async function fetchCachedOutline(id) {
 async function saveCachedOutline(id, outline) {
   await fetch(`/api/books/${encodeURIComponent(id)}/outline`, {
     method: "PATCH",
-    headers: { "Content-Type": "application/json" },
+    headers: bookAccessHeaders({ "Content-Type": "application/json" }),
     body: JSON.stringify({ outline }),
   });
 }

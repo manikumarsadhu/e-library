@@ -37,12 +37,20 @@ export async function generateStream({ contents, systemInstruction }) {
  */
 export async function handleChatRoute(req, res) {
   const body = await readJsonBody(req);
-  const { prompt, pageContext, pageNumber, bookTitle, history } = body;
+  const { prompt, pageContext, pageNumber, bookTitle, history } = body || {};
 
-  if (!prompt) {
+  if (typeof prompt !== "string" || !prompt.trim()) {
     res.status(400).json({ error: "prompt is required" });
     return;
   }
+  if (prompt.length > 4000) {
+    res.status(400).json({ error: "prompt must not exceed 4000 characters" });
+    return;
+  }
+
+  const safeTitle = typeof bookTitle === "string" ? bookTitle.slice(0, 255) : "Unknown";
+  const safeContext = typeof pageContext === "string" ? pageContext.slice(0, 12000) : "No text context available.";
+  const safeHistory = Array.isArray(history) ? history.slice(-20) : [];
 
   // Setup headers for SSE / Chunked Transfer streaming
   res.setHeader("Content-Type", "text/plain; charset=utf-8");
@@ -55,24 +63,24 @@ export async function handleChatRoute(req, res) {
 
     // Reconstruct conversation history for Gemini
     const contents = [];
-    if (history && Array.isArray(history)) {
-      for (const msg of history) {
+    for (const msg of safeHistory) {
+      if (msg && typeof msg.text === "string" && msg.text.trim()) {
         contents.push({
           role: msg.role === "assistant" ? "model" : "user",
-          parts: [{ text: msg.text }],
+          parts: [{ text: msg.text.slice(0, 4000) }],
         });
       }
     }
     // Append current prompt
     contents.push({
       role: "user",
-      parts: [{ text: prompt }],
+      parts: [{ text: prompt.trim() }],
     });
 
-    const systemInstruction = `You are a helpful AI reading assistant for the book "${bookTitle || "Unknown"}".
+    const systemInstruction = `You are a helpful AI reading assistant for the book "${safeTitle}".
 The reader is looking at Page ${pageNumber || "Unknown"}.
 Here is the text context of the current page to help you answer their questions:
-"${pageContext || "No text context available."}"
+"${safeContext}"
 Answer their questions concisely, using markdown when helpful. Reference details from the text context directly where applicable.`;
 
     const responseStream = await ai.models.generateContentStream({
@@ -109,12 +117,17 @@ export async function handleExtractOutlineRoute(req, res) {
   if (!pageSamples || !Array.isArray(pageSamples) || pageSamples.length === 0) {
     return res.status(400).json({ error: "pageSamples array is required" });
   }
+  if (pageSamples.length > 30) {
+    return res.status(400).json({ error: "pageSamples must not exceed 30 entries" });
+  }
 
+  const safeTitle = typeof bookTitle === "string" ? bookTitle.slice(0, 255) : "Unknown";
   const samplesText = pageSamples
-    .map((s) => `--- Page ${s.pageNum} ---\n${(s.text || "").slice(0, 600)}`)
+    .filter((s) => s && typeof s.pageNum === "number" && Number.isFinite(s.pageNum))
+    .map((s) => `--- Page ${s.pageNum} ---\n${String(s.text || "").slice(0, 600)}`)
     .join("\n\n");
 
-  const prompt = `You are analyzing a book called "${bookTitle || "Unknown"}". Below are text samples from various pages.
+  const prompt = `You are analyzing a book called "${safeTitle}". Below are text samples from various pages.
 Identify the main chapters and sections. For each chapter or major section, provide:
 - The title (exactly as written in the book, or a clean version)
 - The page number where it starts

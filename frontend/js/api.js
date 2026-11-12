@@ -97,9 +97,10 @@ export async function fetchBooks(query = "", page = 1, limit = 20, category_id =
   url.searchParams.set("page", String(page));
   url.searchParams.set("limit", String(limit));
   if (category_id) url.searchParams.set("category_id", category_id);
+  const h = headers(true);
   const activePin = pin || getUserPin();
-  if (activePin) url.searchParams.set("pin", activePin);
-  const res = await fetch(url.toString(), { headers: headers(true) });
+  if (activePin) h["x-access-pin"] = activePin;
+  const res = await fetch(url.toString(), { headers: h });
   const data = await parseResponse(res);
   return {
     books: data.books || [],
@@ -136,11 +137,7 @@ export async function deleteBook(id, pin = "") {
   if (activePin) {
     h["x-access-pin"] = activePin;
   }
-  const url = new URL(`${API_BASE_URL}/api/books/${id}`);
-  if (activePin) {
-    url.searchParams.set("pin", activePin);
-  }
-  const res = await fetch(url.toString(), {
+  const res = await fetch(`${API_BASE_URL}/api/books/${id}`, {
     method: "DELETE",
     headers: h,
   });

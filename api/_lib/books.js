@@ -118,10 +118,32 @@ export async function getBook(id) {
 export async function getBookSecret(id) {
   const db = getDb();
   const result = await db.execute(
-    `SELECT id, passcode_hash, storage_source, cover_key, file_key, visibility FROM books WHERE id = ? LIMIT 1`,
+    `SELECT id, passcode_hash, storage_source, cover_key, file_key, visibility, outline FROM books WHERE id = ? LIMIT 1`,
     [id]
   );
   return getRows(result)[0] || null;
+}
+
+export async function canReadBook(id, { passcode = "", isAdmin = false } = {}) {
+  const secret = await getBookSecret(id);
+  if (!secret) return { exists: false, allowed: false, secret: null };
+  if (isAdmin || secret.visibility !== "private") {
+    return { exists: true, allowed: true, secret };
+  }
+  const allowed = Boolean(
+    passcode && secret.passcode_hash && verifyPasscode(passcode, secret.passcode_hash)
+  );
+  return { exists: true, allowed, secret };
+}
+
+export async function hasRegisteredDriveFile(fileId) {
+  if (!/^[a-zA-Z0-9_-]{20,60}$/.test(fileId || "")) return false;
+  const db = getDb();
+  const result = await db.execute(
+    `SELECT id FROM books WHERE file_key = ? LIMIT 1`,
+    [makeGoogleDriveKey(fileId)]
+  );
+  return getRows(result).length > 0;
 }
 
 export async function createBook(body, { isAdmin = false } = {}) {
