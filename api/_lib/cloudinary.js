@@ -1,4 +1,15 @@
+import crypto from "crypto";
 import { v2 as cloudinary } from "cloudinary";
+
+function assertCloudinaryConfigured() {
+  if (
+    !process.env.CLOUDINARY_CLOUD_NAME ||
+    !process.env.CLOUDINARY_API_KEY ||
+    !process.env.CLOUDINARY_API_SECRET
+  ) {
+    throw new Error("Cloudinary is not configured");
+  }
+}
 
 export function configureCloudinary() {
   cloudinary.config({
@@ -6,6 +17,26 @@ export function configureCloudinary() {
     api_key: process.env.CLOUDINARY_API_KEY,
     api_secret: process.env.CLOUDINARY_API_SECRET,
   });
+}
+
+export function createCloudinaryUploadSignature(bookId, kind) {
+  assertCloudinaryConfigured();
+  const folder = kind === "cover" ? "e-library/covers" : "e-library/files";
+  const public_id = `${bookId}_${crypto.randomUUID()}`;
+  const timestamp = Math.floor(Date.now() / 1000);
+  const signature = cloudinary.utils.api_sign_request(
+    { folder, public_id, timestamp },
+    process.env.CLOUDINARY_API_SECRET
+  );
+  return {
+    cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+    api_key: process.env.CLOUDINARY_API_KEY,
+    timestamp,
+    folder,
+    public_id,
+    signature,
+    resource_type: "image",
+  };
 }
 
 export function parseCloudinaryKey(key) {

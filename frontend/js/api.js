@@ -147,28 +147,68 @@ export async function deleteBook(id, pin = "") {
   return parseResponse(res);
 }
 
-export async function uploadCover(bookId, file) {
+const MAX_COVER_SIZE = 5 * 1024 * 1024;
+const MAX_FILE_SIZE = 25 * 1024 * 1024;
+const ALLOWED_COVER_TYPES = new Set(["image/jpeg", "image/png", "image/webp", "image/gif"]);
+
+async function uploadAsset(bookId, kind, file) {
+  const maxSize = kind === "cover" ? MAX_COVER_SIZE : MAX_FILE_SIZE;
+  if (file.size > maxSize) {
+    throw new Error(`File size exceeds maximum allowed limit of ${maxSize / (1024 * 1024)} MB`);
+  }
+  const isAllowedCover = ALLOWED_COVER_TYPES.has(file.type);
+  const isPdf = file.type === "application/pdf" || (!file.type && /\.pdf$/i.test(file.name));
+  if (kind === "cover" && !isAllowedCover) {
+    throw new Error("Cover must be JPEG, PNG, WebP, or GIF");
+  }
+  if (kind === "file" && !isPdf && !isAllowedCover) {
+    throw new Error("File must be PDF or an image");
+  }
+
+  // Upload directly to Cloudinary from the browser to bypass Vercel's 4.5 MB function body limit
+  const sigRes = await fetch(`${API_BASE_URL}/api/books/${bookId}/upload-signature`, {
+    method: "POST",
+    headers: { ...headers(true), "Content-Type": "application/json" },
+    body: JSON.stringify({ kind }),
+  });
+  const sig = await parseResponse(sigRes);
+
   const form = new FormData();
   form.append("file", file);
-  const res = await fetch(`${API_BASE_URL}/api/books/${bookId}/cover`, {
+  form.append("api_key", sig.api_key);
+  form.append("timestamp", String(sig.timestamp));
+  form.append("folder", sig.folder);
+  form.append("public_id", sig.public_id);
+  form.append("signature", sig.signature);
+
+  const cloudRes = await fetch(
+    `https://api.cloudinary.com/v1_1/${encodeURIComponent(sig.cloud_name)}/${sig.resource_type}/upload`,
+    { method: "POST", body: form }
+  );
+  const cloudData = await cloudRes.json().catch(() => null);
+  if (!cloudRes.ok) {
+    throw new Error(cloudData?.error?.message || "Cloudinary upload failed");
+  }
+
+  const saveRes = await fetch(`${API_BASE_URL}/api/books/${bookId}/${kind}`, {
     method: "POST",
-    headers: headers(true),
-    body: form,
+    headers: { ...headers(true), "Content-Type": "application/json" },
+    body: JSON.stringify({
+      public_id: cloudData.public_id,
+      secure_url: cloudData.secure_url,
+      resource_type: cloudData.resource_type || sig.resource_type,
+    }),
   });
-  const data = await parseResponse(res);
+  const data = await parseResponse(saveRes);
   return data.book;
 }
 
-export async function uploadFile(bookId, file) {
-  const form = new FormData();
-  form.append("file", file);
-  const res = await fetch(`${API_BASE_URL}/api/books/${bookId}/file`, {
-    method: "POST",
-    headers: headers(true),
-    body: form,
-  });
-  const data = await parseResponse(res);
-  return data.book;
+export function uploadCover(bookId, file) {
+  return uploadAsset(bookId, "cover", file);
+}
+
+export function uploadFile(bookId, file) {
+  return uploadAsset(bookId, "file", file);
 }
 
 export async function fetchCategories() {

@@ -132,14 +132,40 @@ export async function uploadAsset(bookId, req, kind) {
     return { error: `Cloudinary upload failed: ${err.message}`, status: 500 };
   }
 
-  const newKey = makeCloudinaryKey(
-    uploadResult.resource_type,
-    uploadResult.public_id,
-    uploadResult.secure_url
-  );
+  return persistBookCloudinaryAsset(book, kind, uploadResult);
+}
+
+async function persistBookCloudinaryAsset(book, kind, { resource_type, public_id, secure_url }) {
+  const newKey = makeCloudinaryKey(resource_type, public_id, secure_url);
   const oldKey = kind === "cover" ? book.cover_key : book.file_key;
-  await setBookAssetKey(bookId, kind, newKey);
+  await setBookAssetKey(book.id, kind, newKey);
   if (oldKey) await deleteCloudinaryAsset(oldKey);
 
-  return { book: await getBook(bookId) };
+  return { book: await getBook(book.id) };
+}
+
+export async function saveDirectCloudinaryAsset(bookId, kind, payload) {
+  const book = await getBook(bookId);
+  if (!book) return { error: "Book not found", status: 404 };
+
+  const cloudName = process.env.CLOUDINARY_CLOUD_NAME;
+  if (!cloudName) return { error: "Cloudinary is not configured", status: 503 };
+
+  const { public_id, secure_url, resource_type = "image" } = payload || {};
+  const expectedPrefix = `${kind === "cover" ? "e-library/covers" : "e-library/files"}/${bookId}_`;
+
+  if (typeof public_id !== "string" || !public_id.startsWith(expectedPrefix)) {
+    return { error: "Invalid Cloudinary public_id", status: 400 };
+  }
+  if (
+    typeof secure_url !== "string" ||
+    !secure_url.startsWith(`https://res.cloudinary.com/${cloudName}/`)
+  ) {
+    return { error: "Invalid Cloudinary secure_url", status: 400 };
+  }
+  if (resource_type !== "image" && resource_type !== "raw") {
+    return { error: "Invalid Cloudinary resource_type", status: 400 };
+  }
+
+  return persistBookCloudinaryAsset(book, kind, { resource_type, public_id, secure_url });
 }

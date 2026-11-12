@@ -9,8 +9,11 @@ import {
   updateBook,
 } from "./_lib/books.js";
 import { readJsonBody } from "./_lib/body.js";
-import { parseCloudinaryKey } from "./_lib/cloudinary.js";
-import { uploadAsset } from "./_lib/multipart.js";
+import {
+  createCloudinaryUploadSignature,
+  parseCloudinaryKey,
+} from "./_lib/cloudinary.js";
+import { saveDirectCloudinaryAsset, uploadAsset } from "./_lib/multipart.js";
 import { healthCheck } from "./_lib/health.js";
 import { checkRateLimit } from "./_lib/rate-limit.js";
 import {
@@ -293,11 +296,16 @@ export default async function handler(req, res) {
       parts[0] === "api" &&
       parts[1] === "books" &&
       parts.length === 4 &&
-      parts[3] === "cover"
+      parts[3] === "upload-signature"
     ) {
-      const result = await uploadAsset(parts[2], req, "cover");
-      if (result.error) return res.status(result.status).json({ error: result.error });
-      return res.status(200).json({ book: result.book });
+      const body = await readJsonBody(req);
+      const kind = body?.kind;
+      if (kind !== "cover" && kind !== "file") {
+        return res.status(400).json({ error: "kind must be 'cover' or 'file'" });
+      }
+      const book = await getBook(parts[2]);
+      if (!book) return res.status(404).json({ error: "Book not found" });
+      return res.status(200).json(createCloudinaryUploadSignature(parts[2], kind));
     }
 
     if (
@@ -305,9 +313,13 @@ export default async function handler(req, res) {
       parts[0] === "api" &&
       parts[1] === "books" &&
       parts.length === 4 &&
-      parts[3] === "file"
+      (parts[3] === "cover" || parts[3] === "file")
     ) {
-      const result = await uploadAsset(parts[2], req, "file");
+      const kind = parts[3];
+      const contentType = req.headers["content-type"] || "";
+      const result = contentType.includes("application/json")
+        ? await saveDirectCloudinaryAsset(parts[2], kind, await readJsonBody(req))
+        : await uploadAsset(parts[2], req, kind);
       if (result.error) return res.status(result.status).json({ error: result.error });
       return res.status(200).json({ book: result.book });
     }

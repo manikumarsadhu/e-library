@@ -1,6 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { v2 as cloudinary } from "cloudinary";
 import { computePageOffset, rowToBook } from "../api/_lib/books.js";
+import { createCloudinaryUploadSignature } from "../api/_lib/cloudinary.js";
 import {
   parseGoogleDriveFileId,
   makeGoogleDriveKey,
@@ -84,4 +86,38 @@ test("hashPasscode and verifyPasscode correctly validate user passcodes", () => 
   const pinHash = hashPasscode("1234");
   assert.equal(pinHash, "03ac674216f3e15c761ee1a5e255f067953623c8b388b4459e13f978d7c846f4");
   assert.equal(verifyPasscode("1234", pinHash), true);
+});
+
+test("createCloudinaryUploadSignature signs direct upload params", () => {
+  const prev = {
+    name: process.env.CLOUDINARY_CLOUD_NAME,
+    key: process.env.CLOUDINARY_API_KEY,
+    secret: process.env.CLOUDINARY_API_SECRET,
+  };
+  process.env.CLOUDINARY_CLOUD_NAME = "demo-cloud";
+  process.env.CLOUDINARY_API_KEY = "demo-key";
+  process.env.CLOUDINARY_API_SECRET = "demo-secret";
+
+  try {
+    const sig = createCloudinaryUploadSignature("book-123", "file");
+    assert.equal(sig.cloud_name, "demo-cloud");
+    assert.equal(sig.api_key, "demo-key");
+    assert.equal(sig.folder, "e-library/files");
+    assert.equal(sig.resource_type, "image");
+    assert.ok(sig.public_id.startsWith("book-123_"));
+    const expected = cloudinary.utils.api_sign_request(
+      { folder: sig.folder, public_id: sig.public_id, timestamp: sig.timestamp },
+      "demo-secret"
+    );
+    assert.equal(sig.signature, expected);
+  } finally {
+    for (const [envKey, val] of [
+      ["CLOUDINARY_CLOUD_NAME", prev.name],
+      ["CLOUDINARY_API_KEY", prev.key],
+      ["CLOUDINARY_API_SECRET", prev.secret],
+    ]) {
+      if (val === undefined) delete process.env[envKey];
+      else process.env[envKey] = val;
+    }
+  }
 });
