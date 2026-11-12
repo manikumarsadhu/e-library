@@ -1,4 +1,4 @@
-import { requireAuth, setCorsHeaders } from "./lib/auth.js";
+import { requireAuth, setCorsHeaders } from "./_lib/auth.js";
 import {
   createBook,
   deleteBook,
@@ -7,27 +7,27 @@ import {
   listBooks,
   setBookOutline,
   updateBook,
-} from "./lib/books.js";
-import { readJsonBody } from "./lib/body.js";
-import { parseCloudinaryKey } from "./lib/cloudinary.js";
-import { uploadAsset } from "./lib/multipart.js";
-import { healthCheck } from "./lib/health.js";
-import { checkRateLimit } from "./lib/rate-limit.js";
+} from "./_lib/books.js";
+import { readJsonBody } from "./_lib/body.js";
+import { parseCloudinaryKey } from "./_lib/cloudinary.js";
+import { uploadAsset } from "./_lib/multipart.js";
+import { healthCheck } from "./_lib/health.js";
+import { checkRateLimit } from "./_lib/rate-limit.js";
 import {
   handleChatRoute,
   handleExtractOutlineRoute,
-} from "./lib/ai.js";
+} from "./_lib/ai.js";
 import {
   createCategory,
   deleteCategory,
   listCategories,
   updateCategory,
-} from "./lib/categories.js";
+} from "./_lib/categories.js";
 import {
   fetchGoogleDriveFile,
   fetchGoogleDriveThumbnail,
   parseGoogleDriveKey,
-} from "./lib/gdrive.js";
+} from "./_lib/gdrive.js";
 
 function parsePositiveInt(value, fallback) {
   const num = Number.parseInt(value ?? "", 10);

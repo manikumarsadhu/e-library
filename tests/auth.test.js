@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { requireAuth } from "../api/lib/auth.js";
+import { requireAuth } from "../api/_lib/auth.js";
 
 test("allows unauthenticated access in non-production when API_KEY missing", () => {
   const oldNodeEnv = process.env.NODE_ENV;

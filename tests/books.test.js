@@ -1,13 +1,13 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { computePageOffset, rowToBook } from "../api/lib/books.js";
+import { computePageOffset, rowToBook } from "../api/_lib/books.js";
 import {
   parseGoogleDriveFileId,
   makeGoogleDriveKey,
   parseGoogleDriveKey,
   hashPasscode,
   verifyPasscode,
-} from "../api/lib/gdrive.js";
+} from "../api/_lib/gdrive.js";
 
 test("computePageOffset returns stable pagination offset", () => {
   assert.equal(computePageOffset(1, 20), 0);

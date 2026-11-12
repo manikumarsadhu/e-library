@@ -13,6 +13,7 @@
   "dependencies": {
     "@google/genai": "^2.8.0",
     "@tidbcloud/serverless": "^0.2.0",
+    "@vercel/analytics": "^2.0.1",
     "busboy": "^1.6.0",
     "cloudinary": "^2.2.0"
   },
