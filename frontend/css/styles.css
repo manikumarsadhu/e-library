@@ -909,18 +909,107 @@ body.is-admin .admin-badge {
   line-height: 1.2;
 }
 
-.add-form {
+.add-form,
+#gdrive-fields,
+#cloudinary-fields {
   display: grid;
   gap: 1.1rem;
 }
 
 @media (min-width: 600px) {
-  .add-form {
+  .add-form,
+  #gdrive-fields,
+  #cloudinary-fields {
     grid-template-columns: 1fr 1fr;
   }
+  #gdrive-fields,
+  #cloudinary-fields,
+  .gdrive-guide,
   .form-actions {
     grid-column: 1 / -1;
   }
+}
+
+.gdrive-guide {
+  background: rgba(59, 130, 246, 0.08);
+  border: 1px solid rgba(59, 130, 246, 0.28);
+  border-radius: var(--radius);
+  padding: 1rem 1.1rem;
+}
+
+.gdrive-guide-header {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+  margin-bottom: 0.85rem;
+  color: #f8fafc;
+  font-size: 0.92rem;
+}
+
+.gdrive-guide-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.15rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #93c5fd;
+  background: rgba(59, 130, 246, 0.2);
+  border: 1px solid rgba(59, 130, 246, 0.4);
+}
+
+.gdrive-guide-steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 0.75rem;
+}
+
+.gdrive-guide-steps li {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.65rem;
+  background: rgba(15, 23, 42, 0.55);
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  border-radius: 8px;
+  padding: 0.7rem 0.8rem;
+}
+
+.guide-step-num {
+  flex: 0 0 22px;
+  height: 22px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #fff;
+  background: var(--color-primary);
+  margin-top: 0.1rem;
+}
+
+.gdrive-guide-steps strong {
+  display: block;
+  font-size: 0.84rem;
+  color: #e2e8f0;
+  margin-bottom: 0.2rem;
+}
+
+.gdrive-guide-steps p {
+  margin: 0;
+  font-size: 0.78rem;
+  line-height: 1.4;
+  color: var(--color-muted);
+}
+
+.gdrive-guide-steps b {
+  color: #cbd5e1;
 }
 
 .form-row label {
