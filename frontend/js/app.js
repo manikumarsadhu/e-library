@@ -567,6 +567,10 @@ addForm.addEventListener("submit", async (e) => {
       throw new Error(`Upload failed — book was not saved. ${uploadErr.message}`);
     }
     addForm.reset();
+    if (storageSourceSelect && getApiKey()) {
+      storageSourceSelect.value = "cloudinary";
+      updateStorageFieldsUI();
+    }
     setStatus("Book added.", "success");
     currentPage = 1;
     hideAddBookSection();
@@ -714,8 +718,8 @@ function toggleAdminOptions(isAdmin) {
   adminOptions.forEach((opt) => {
     opt.style.display = isAdmin ? "" : "none";
   });
-  if (!isAdmin && storageSourceSelect && storageSourceSelect.value === "cloudinary") {
-    storageSourceSelect.value = "gdrive";
+  if (storageSourceSelect) {
+    storageSourceSelect.value = isAdmin ? "cloudinary" : "gdrive";
     updateStorageFieldsUI();
   }
 }

@@ -770,7 +770,8 @@ h1, h2, h3, h4, .brand-name {
 
 .add-btn-wrap {
   display: flex;
-  align-items: flex-end;
+  align-items: center;
+  gap: 0.5rem;
 }
 
 .admin-wrap {
@@ -875,6 +876,30 @@ h1, h2, h3, h4, .brand-name {
   margin: 0;
   font-size: 1.25rem;
   color: #fff;
+}
+
+.add-header-title {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+}
+
+.admin-badge {
+  display: none;
+  align-items: center;
+  padding: 0.2rem 0.6rem;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #93c5fd;
+  background: rgba(59, 130, 246, 0.16);
+  border: 1px solid rgba(59, 130, 246, 0.4);
+}
+
+body.is-admin .admin-badge {
+  display: inline-flex;
 }
 
 .close-add-btn {

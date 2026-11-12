@@ -367,6 +367,7 @@
           />
         </div>
         <div class="add-btn-wrap">
+          <span class="admin-badge" aria-label="Admin mode unlocked">Admin</span>
           <button type="button" id="toggle-add-btn" class="btn btn-primary add-nav-btn" aria-expanded="false" aria-controls="add-book-section">+ Add Book</button>
         </div>
         <div class="admin-wrap" id="admin-wrap" style="display: none;">
@@ -387,7 +388,10 @@
       <!-- Collapsible Add a Book Drawer -->
       <section id="add-book-section" class="add-book" aria-labelledby="add-heading" style="display: none;">
         <div class="add-header-row">
-          <h2 id="add-heading">Add a book</h2>
+          <div class="add-header-title">
+            <h2 id="add-heading">Add a book</h2>
+            <span class="admin-badge" aria-label="Admin mode unlocked">Admin Mode</span>
+          </div>
           <button type="button" id="close-add-btn" class="btn btn-secondary close-add-btn" aria-label="Close Add book section">&times; Close</button>
         </div>
         <form id="add-form" class="add-form">
