@@ -1,5 +1,13 @@
 const buckets = new Map();
 
+export function getClientIp(req) {
+  const realIp = req.headers?.["x-real-ip"] || req.headers?.["x-vercel-forwarded-for"];
+  if (realIp) return String(realIp).split(",")[0].trim();
+  const forwarded = req.headers?.["x-forwarded-for"];
+  if (forwarded) return String(forwarded).split(",")[0].trim();
+  return req.socket?.remoteAddress || "unknown";
+}
+
 export function checkRateLimit({ key, limit, windowMs }) {
   const now = Date.now();
   const windowStart = now - windowMs;

@@ -1,4 +1,8 @@
 import { GoogleGenAI } from "@google/genai";
+import { requireAuth } from "./auth.js";
+import { readJsonBody } from "./body.js";
+import { canReadBook } from "./books.js";
+import { checkRateLimit, getClientIp } from "./rate-limit.js";
 
 let aiInstance = null;
 
@@ -18,7 +22,59 @@ export function getAiClient() {
   return aiInstance;
 }
 
-import { readJsonBody } from "./body.js";
+export function verifyAiOrigin(req, isAdmin) {
+  if (isAdmin || process.env.NODE_ENV !== "production") return true;
+  const allowed = process.env.CORS_ORIGIN || "https://e-library-beta-ruby.vercel.app";
+  if (allowed === "*") return true;
+  const origin = req.headers?.origin || "";
+  return origin === allowed;
+}
+
+async function authorizeAiRequest(req, res, body) {
+  const isAdmin = requireAuth(req);
+  if (!verifyAiOrigin(req, isAdmin)) {
+    res.status(403).json({ error: "Forbidden origin" });
+    return null;
+  }
+
+  const bookId = typeof body?.bookId === "string" ? body.bookId.trim() : "";
+  if (!bookId) {
+    res.status(400).json({ error: "bookId is required" });
+    return null;
+  }
+
+  const passcode = String(req.headers?.["x-access-pin"] || "");
+  const access = await canReadBook(bookId, { passcode, isAdmin });
+  if (!access.exists) {
+    res.status(404).json({ error: "Book not found" });
+    return null;
+  }
+  if (!access.allowed) {
+    res.status(403).json({ error: "Passcode or admin authorization required for this book" });
+    return null;
+  }
+
+  // ponytail: in-memory daily AI quota resets on serverless cold starts; upgrade to Redis/TiDB counter for cross-instance enforcement
+  if (!isAdmin && process.env.NODE_ENV === "production") {
+    const DAY_MS = 86_400_000;
+    const perIpLimit = Number.parseInt(process.env.AI_DAILY_LIMIT_PER_IP ?? "", 10) || 100;
+    const globalLimit = Number.parseInt(process.env.AI_DAILY_GLOBAL_LIMIT ?? "", 10) || 1000;
+
+    for (const [key, limit] of [
+      [`${getClientIp(req)}:ai-daily`, perIpLimit],
+      ["global:ai-daily", globalLimit],
+    ]) {
+      const result = checkRateLimit({ key, limit, windowMs: DAY_MS });
+      if (!result.allowed) {
+        res.setHeader("Retry-After", String(result.retryAfterSeconds));
+        res.status(429).json({ error: "Daily AI quota reached. Please try again later." });
+        return null;
+      }
+    }
+  }
+
+  return access;
+}
 
 /**
  * Helper to stream completion chunks from Gemini 2.5 Flash.
@@ -37,6 +93,9 @@ export async function generateStream({ contents, systemInstruction }) {
  */
 export async function handleChatRoute(req, res) {
   const body = await readJsonBody(req);
+  const access = await authorizeAiRequest(req, res, body);
+  if (!access) return;
+
   const { prompt, pageContext, pageNumber, bookTitle, history } = body || {};
 
   if (typeof prompt !== "string" || !prompt.trim()) {
@@ -112,6 +171,20 @@ Answer their questions concisely, using markdown when helpful. Reference details
  */
 export async function handleExtractOutlineRoute(req, res) {
   const body = await readJsonBody(req);
+  const access = await authorizeAiRequest(req, res, body);
+  if (!access) return;
+
+  if (access.secret?.outline) {
+    try {
+      const cached = JSON.parse(access.secret.outline);
+      if (Array.isArray(cached) && cached.length > 0) {
+        return res.status(200).json({ outline: cached });
+      }
+    } catch {
+      // Ignore malformed cache and re-extract
+    }
+  }
+
   const { bookTitle, pageSamples } = body || {};
 
   if (!pageSamples || !Array.isArray(pageSamples) || pageSamples.length === 0) {

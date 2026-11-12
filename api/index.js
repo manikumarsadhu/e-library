@@ -17,7 +17,7 @@ import {
 } from "./_lib/cloudinary.js";
 import { saveDirectCloudinaryAsset, uploadAsset } from "./_lib/multipart.js";
 import { healthCheck } from "./_lib/health.js";
-import { checkRateLimit } from "./_lib/rate-limit.js";
+import { checkRateLimit, getClientIp } from "./_lib/rate-limit.js";
 import {
   handleChatRoute,
   handleExtractOutlineRoute,
@@ -38,14 +38,6 @@ import {
 function parsePositiveInt(value, fallback) {
   const num = Number.parseInt(value ?? "", 10);
   return Number.isFinite(num) && num > 0 ? num : fallback;
-}
-
-function getClientIp(req) {
-  const realIp = req.headers["x-real-ip"] || req.headers["x-vercel-forwarded-for"];
-  if (realIp) return String(realIp).split(",")[0].trim();
-  const forwarded = req.headers["x-forwarded-for"];
-  if (forwarded) return String(forwarded).split(",")[0].trim();
-  return req.socket?.remoteAddress || "unknown";
 }
 
 function getAccessPin(req) {

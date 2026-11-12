@@ -948,8 +948,9 @@ async function sendUserMessage(customPrompt = null) {
     // Call serverless /api/ai/chat route
     const response = await fetch("/api/ai/chat", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: bookAccessHeaders({ "Content-Type": "application/json" }),
       body: JSON.stringify({
+        bookId,
         prompt: promptText,
         pageContext: pageText,
         pageNumber: currentPage,
@@ -1527,7 +1528,7 @@ async function generateChaptersOutline(force = false) {
 }
 
 async function extractOutlineWithAI() {
-  if (!pdfDoc) return [];
+  if (!pdfDoc || !bookId) return [];
   const samplePageNums = [1, 5, 10, 15, 20, 25].filter((p) => p <= pdfDoc.numPages);
   const pageSamples = [];
   for (const pageNum of samplePageNums) {
@@ -1541,8 +1542,8 @@ async function extractOutlineWithAI() {
   try {
     const resp = await fetch("/api/ai/extract-outline", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ bookTitle: docTitle, pageSamples }),
+      headers: bookAccessHeaders({ "Content-Type": "application/json" }),
+      body: JSON.stringify({ bookId, bookTitle: docTitle, pageSamples }),
     });
     if (!resp.ok) return [];
     const data = await resp.json();
