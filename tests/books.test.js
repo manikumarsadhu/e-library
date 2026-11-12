@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { v2 as cloudinary } from "cloudinary";
-import { computePageOffset, rowToBook } from "../api/_lib/books.js";
+import { computePageOffset, rowToBook, toPublicBook } from "../api/_lib/books.js";
 import { createCloudinaryUploadSignature } from "../api/_lib/cloudinary.js";
 import {
   parseGoogleDriveFileId,
@@ -120,4 +120,36 @@ test("createCloudinaryUploadSignature signs direct upload params", () => {
       else process.env[envKey] = val;
     }
   }
+});
+
+test("toPublicBook strips internal and storage fields from public responses", () => {
+  const row = {
+    id: "book-1",
+    title: "Public Title",
+    author: "Author Name",
+    year: 2024,
+    cover_key: "cloudinary:image:v1:https://res.cloudinary.com/demo/image/upload/c.jpg",
+    file_key: "gdrive:1AbCDefGhIjKlMnOpQrStUvWxYz123456",
+    outline: JSON.stringify([{ title: "Intro", pageNum: 1 }]),
+    category_id: "cat-1",
+    storage_source: "gdrive",
+    visibility: "private",
+    passcode_hash: "salt:hash",
+    created_at: "2026-01-01 00:00:00",
+    updated_at: "2026-01-02 00:00:00",
+  };
+
+  assert.deepEqual(toPublicBook(row, { hasPin: false }), {
+    id: "book-1",
+    title: "Public Title",
+    author: "Author Name",
+    year: 2024,
+    category_id: "cat-1",
+    has_file: true,
+    has_cover: true,
+    is_private: true,
+    can_delete: false,
+  });
+
+  assert.equal(toPublicBook(row, { hasPin: true }).can_delete, true);
 });

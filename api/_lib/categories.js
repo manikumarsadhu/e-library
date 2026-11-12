@@ -4,12 +4,11 @@ import { getDb, getRows } from "./db.js";
 export async function listCategories() {
   const db = getDb();
   const result = await db.execute(
-    `SELECT id, name, created_at FROM categories ORDER BY name ASC`
+    `SELECT id, name FROM categories ORDER BY name ASC`
   );
   return getRows(result).map((row) => ({
     id: row.id,
     name: row.name,
-    created_at: row.created_at,
   }));
 }
 

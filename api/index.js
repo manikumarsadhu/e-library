@@ -5,6 +5,7 @@ import {
   deleteBook,
   getBook,
   getBookOutline,
+  getBookSecret,
   hasRegisteredDriveFile,
   listBooks,
   setBookOutline,
@@ -68,6 +69,34 @@ async function streamDrivePdf(res, fileId) {
   } catch (driveErr) {
     if (res.destroyed || res.writableEnded) return;
     return res.status(502).json({ error: driveErr.message });
+  }
+}
+
+async function streamDriveThumbnail(res, fileId) {
+  if (!(await hasRegisteredDriveFile(fileId))) {
+    return res.status(404).json({ error: "Thumbnail not found" });
+  }
+  try {
+    const thumbRes = await fetchGoogleDriveThumbnail(fileId);
+    if (res.destroyed || res.writableEnded) return;
+    const contentType = thumbRes.headers.get("content-type") || "image/png";
+    res.setHeader("Content-Type", contentType);
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    res.setHeader("Cache-Control", "public, max-age=86400");
+    const arrayBuffer = await thumbRes.arrayBuffer();
+    if (res.destroyed || res.writableEnded) return;
+    const buffer = Buffer.from(arrayBuffer);
+    res.setHeader("Content-Length", buffer.length);
+    res.statusCode = 200;
+    try {
+      res.end(buffer);
+    } catch {
+      // Client aborted connection
+    }
+    return;
+  } catch (thumbErr) {
+    if (res.destroyed || res.writableEnded) return;
+    return res.status(502).json({ error: thumbErr.message });
   }
 }
 
@@ -155,8 +184,48 @@ export default async function handler(req, res) {
       const access = await canReadBook(parts[2], { passcode: getAccessPin(req), isAdmin });
       if (!access.exists) return res.status(404).json({ error: "Book not found" });
       if (!access.allowed) return res.status(403).json({ error: "Passcode required to access this book" });
-      const book = await getBook(parts[2]);
+      const book = await getBook(parts[2], { isAdmin, hasPin: Boolean(getAccessPin(req)) });
       return res.status(200).json({ book });
+    }
+
+    // Opaque book thumbnail endpoint (hides storage provider/URLs from public JSON)
+    if (method === "GET" && parts[0] === "api" && parts[1] === "books" && parts.length === 4 && parts[3] === "thumb") {
+      if (applyRateLimit(req, res, "thumbnails", 100)) return;
+      const secret = await getBookSecret(parts[2]);
+      if (!secret) return res.status(404).json({ error: "Thumbnail not found" });
+      if (secret.cover_key) {
+        const parsedCover = parseCloudinaryKey(secret.cover_key);
+        if (parsedCover) return res.redirect(302, parsedCover.url);
+      }
+      if (secret.file_key?.startsWith("cloudinary:")) {
+        const parsedPdf = parseCloudinaryKey(secret.file_key);
+        if (parsedPdf) {
+          const thumbUrl = parsedPdf.url
+            .replace(/\.pdf$/i, ".jpg")
+            .replace("/upload/", "/upload/pg_1/");
+          return res.redirect(302, thumbUrl);
+        }
+      }
+      if (secret.file_key?.startsWith("gdrive:")) {
+        const parsedGdrive = parseGoogleDriveKey(secret.file_key);
+        if (parsedGdrive) return await streamDriveThumbnail(res, parsedGdrive.fileId);
+      }
+      return res.status(404).json({ error: "Thumbnail not found" });
+    }
+
+    // Opaque book PDF content endpoint (hides storage provider/URLs from public JSON)
+    if (method === "GET" && parts[0] === "api" && parts[1] === "books" && parts.length === 4 && parts[3] === "content") {
+      if (applyRateLimit(req, res, "files", 60)) return;
+      const secret = await getBookSecret(parts[2]);
+      if (!secret || !secret.file_key) return res.status(404).json({ error: "File not found" });
+      if (secret.file_key.startsWith("gdrive:")) {
+        const parsedGdrive = parseGoogleDriveKey(secret.file_key);
+        if (!parsedGdrive) return res.status(404).json({ error: "Invalid Google Drive key" });
+        return await streamDrivePdf(res, parsedGdrive.fileId);
+      }
+      const parsed = parseCloudinaryKey(secret.file_key);
+      if (!parsed) return res.status(404).json({ error: "File not found or legacy storage" });
+      return res.redirect(302, parsed.url);
     }
 
     // Direct Google Drive file streaming proxy
@@ -168,32 +237,7 @@ export default async function handler(req, res) {
     // Google Drive file thumbnail proxy (first page of document as default cover)
     if (method === "GET" && parts[0] === "api" && parts[1] === "drive" && parts.length === 4 && parts[3] === "thumbnail") {
       if (applyRateLimit(req, res, "thumbnails", 100)) return;
-      const fileId = parts[2];
-      if (!(await hasRegisteredDriveFile(fileId))) {
-        return res.status(404).json({ error: "Thumbnail not found" });
-      }
-      try {
-        const thumbRes = await fetchGoogleDriveThumbnail(fileId);
-        if (res.destroyed || res.writableEnded) return;
-        const contentType = thumbRes.headers.get("content-type") || "image/png";
-        res.setHeader("Content-Type", contentType);
-        res.setHeader("Access-Control-Allow-Origin", "*");
-        res.setHeader("Cache-Control", "public, max-age=86400");
-        const arrayBuffer = await thumbRes.arrayBuffer();
-        if (res.destroyed || res.writableEnded) return;
-        const buffer = Buffer.from(arrayBuffer);
-        res.setHeader("Content-Length", buffer.length);
-        res.statusCode = 200;
-        try {
-          res.end(buffer);
-        } catch {
-          // Client aborted connection
-        }
-        return;
-      } catch (thumbErr) {
-        if (res.destroyed || res.writableEnded) return;
-        return res.status(502).json({ error: thumbErr.message });
-      }
+      return await streamDriveThumbnail(res, parts[2]);
     }
 
     if (method === "GET" && parts[0] === "api" && parts[1] === "files" && parts.length >= 3) {

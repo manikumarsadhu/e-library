@@ -30,6 +30,20 @@ export function rowToBook(row) {
   };
 }
 
+export function toPublicBook(row, { hasPin = false } = {}) {
+  return {
+    id: row.id,
+    title: row.title,
+    author: row.author,
+    year: row.year ?? null,
+    category_id: row.category_id ?? null,
+    has_file: Boolean(row.file_key),
+    has_cover: Boolean(row.cover_key || row.file_key),
+    is_private: row.visibility === "private",
+    can_delete: Boolean(hasPin && row.passcode_hash),
+  };
+}
+
 export function computePageOffset(page, limit) {
   return (page - 1) * limit;
 }
@@ -94,7 +108,10 @@ export async function listBooks({ query, page, limit, category_id, passcode, sco
     `SELECT ${BOOK_COLUMNS} FROM books ${whereSql} ${orderSql} LIMIT ? OFFSET ?`,
     [...params, ...orderParams, limit, offset]
   );
-  const books = getRows(listResult).map(rowToBook);
+  const hasPin = Boolean(pinHash);
+  const books = getRows(listResult).map((row) =>
+    isAdmin ? rowToBook(row) : toPublicBook(row, { hasPin })
+  );
 
   return {
     books,
@@ -105,14 +122,15 @@ export async function listBooks({ query, page, limit, category_id, passcode, sco
   };
 }
 
-export async function getBook(id) {
+export async function getBook(id, { isAdmin = true, hasPin = false } = {}) {
   const db = getDb();
   const result = await db.execute(
     `SELECT ${BOOK_COLUMNS} FROM books WHERE id = ? LIMIT 1`,
     [id]
   );
   const row = getRows(result)[0];
-  return row ? rowToBook(row) : null;
+  if (!row) return null;
+  return isAdmin ? rowToBook(row) : toPublicBook(row, { hasPin });
 }
 
 export async function getBookSecret(id) {

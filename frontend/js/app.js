@@ -5,7 +5,6 @@ import {
   deleteBook,
   uploadCover,
   uploadFile,
-  fileUrl,
   getApiKey,
   setApiKey,
   validateApiKey,
@@ -89,44 +88,16 @@ function createEl(tag, className, text) {
   return el;
 }
 
-function getPdfThumbnailUrl(fileKey) {
-  if (!fileKey) return null;
-  if (fileKey.startsWith("cloudinary:")) {
-    const parts = fileKey.split(":");
-    if (parts.length >= 4) {
-      const url = parts.slice(3).join(":");
-      // Change extension to jpg and request page 1 (pg_1)
-      let thumbUrl = url.replace(/\.pdf$/i, ".jpg");
-      thumbUrl = thumbUrl.replace("/upload/", "/upload/pg_1/");
-      return thumbUrl;
-    }
-  }
-  if (fileKey.startsWith("gdrive:")) {
-    const fileId = fileKey.slice(7).trim();
-    if (fileId) {
-      return `/api/drive/${encodeURIComponent(fileId)}/thumbnail`;
-    }
-  }
-  return null;
-}
-
 function renderCover(book) {
   const wrap = createEl("div", "book-cover");
-  const coverSrc = book.cover_key ? fileUrl(book.cover_key) : getPdfThumbnailUrl(book.file_key);
+  const hasCover = Boolean(book.has_cover || book.cover_key || book.file_key);
 
-  if (coverSrc) {
+  if (hasCover) {
     const img = document.createElement("img");
-    img.src = coverSrc;
+    img.src = `/api/books/${encodeURIComponent(book.id)}/thumb`;
     img.alt = `Cover of ${book.title}`;
     img.loading = "lazy";
     img.onerror = () => {
-      // If backend proxy thumbnail fails, attempt direct Google Drive thumbnail before falling back
-      if (book.file_key?.startsWith("gdrive:") && !img.dataset.failedDirect) {
-        img.dataset.failedDirect = "true";
-        const fileId = book.file_key.slice(7).trim();
-        img.src = `https://drive.google.com/thumbnail?id=${encodeURIComponent(fileId)}&sz=w600`;
-        return;
-      }
       wrap.replaceChildren(createEl("span", "book-cover-placeholder", "No cover"));
     };
     wrap.appendChild(img);
@@ -140,7 +111,7 @@ function renderBookCard(book) {
   const card = createEl("article", "book-card");
   card.setAttribute("role", "listitem");
   card.dataset.id = book.id;
-  if (book.has_passcode) {
+  if (book.can_delete || book.has_passcode) {
     card.classList.add("has-passcode");
   }
 
@@ -162,7 +133,7 @@ function renderBookCard(book) {
   if (book.storage_source === "gdrive") {
     badgesWrap.appendChild(createEl("span", "book-storage-badge", "Google Drive"));
   }
-  if (book.visibility === "private") {
+  if (book.is_private || book.visibility === "private") {
     badgesWrap.appendChild(createEl("span", "book-visibility-badge", "Private"));
   }
   if (badgesWrap.children.length > 0) {
@@ -171,7 +142,7 @@ function renderBookCard(book) {
 
   const actions = createEl("div", "book-actions");
 
-  if (book.file_key) {
+  if (book.has_file || book.file_key) {
     const readBtn = createEl("button", "btn btn-ghost", "Read");
     readBtn.type = "button";
     readBtn.dataset.action = "preview";
@@ -449,8 +420,9 @@ bookList.addEventListener("click", async (e) => {
   // Read/preview action does NOT require Admin API key auth
   if (btn.dataset.action === "preview") {
     const book = allBooks.find((b) => b.id === id);
-    if (book && book.file_key) {
-      const viewerUrl = `viewer.html?file=${encodeURIComponent(fileUrl(book.file_key))}&title=${encodeURIComponent(book.title)}&id=${encodeURIComponent(id)}`;
+    if (book && (book.has_file || book.file_key)) {
+      const contentUrl = `/api/books/${encodeURIComponent(id)}/content`;
+      const viewerUrl = `viewer.html?file=${encodeURIComponent(contentUrl)}&title=${encodeURIComponent(book.title)}&id=${encodeURIComponent(id)}`;
       window.location.href = viewerUrl;
     }
     return;
@@ -473,7 +445,7 @@ bookList.addEventListener("click", async (e) => {
     let pin = getUserPin();
 
     if (!hasAdmin) {
-      if (book?.has_passcode) {
+      if (book?.can_delete || book?.has_passcode) {
         if (!pin) {
           pin = prompt(`Enter the passcode you set for ${label} to delete it:`) || "";
           if (!pin) return;
