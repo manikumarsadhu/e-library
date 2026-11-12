@@ -899,12 +899,7 @@ h1, h2, h3, h4, .brand-name {
   border: 1px solid rgba(59, 130, 246, 0.4);
 }
 
-.admin-only-btn {
-  display: none;
-}
-
-body.is-admin .admin-badge,
-body.is-admin .admin-only-btn {
+body.is-admin .admin-badge {
   display: inline-flex;
 }
 
@@ -1199,6 +1194,14 @@ body.is-admin .book-actions button[data-action="delete"],
 
 body.is-admin .book-actions button[data-action="edit"] {
   display: inline-flex !important;
+}
+
+.btn.admin-only-btn {
+  display: none;
+}
+
+body.is-admin .btn.admin-only-btn {
+  display: inline-flex;
 }
 
 .empty-state {
