@@ -217,7 +217,7 @@ function renderBooks(books, total) {
   } else {
     bookCount.textContent = `Page ${currentPage} of ${totalPages} (${total} total, ${showing} shown)`;
   }
-  pageLabel.textContent = `Page ${currentPage}`;
+  pageLabel.textContent = `Page ${currentPage} of ${totalPages}`;
   prevPageBtn.disabled = currentPage <= 1;
   nextPageBtn.disabled = currentPage >= totalPages;
   pager.hidden = totalPages <= 1;
